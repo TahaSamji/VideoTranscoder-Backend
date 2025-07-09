@@ -1,0 +1,45 @@
+# Build results
+/bin/
+/obj/
+*.dll
+*.exe
+*.app
+*.log
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider and VSCode
+.idea/
+.vscode/
+
+# Visual Studio files
+.vs/
+*.dbmdl
+*.cache
+*.pdb
+
+
+# Publish output
+/publish/
+/out/
+
+# npm / Node.js (if using frontend with Angular/React)
+node_modules/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Dotnet tools
+/.tools/
+.dotnet_tool/
+
+# Resharper
+_ReSharper*/
+*.DotSettings.user
