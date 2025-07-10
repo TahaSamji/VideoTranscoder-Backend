@@ -2,6 +2,8 @@
 
 
 
+using Microsoft.Extensions.Options;
+using VideoTranscoder.VideoTranscoder.Application.Configurations;
 using VideoTranscoder.VideoTranscoder.Application.DTOs;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
 using VideoTranscoder.VideoTranscoder.Domain.Entities;
@@ -17,9 +19,11 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
         private readonly IConfiguration _configuration;
         private readonly FFmpegService _ffmpegService;
         private readonly IThumbnailRepository _thumbnailRepository;
+                private readonly AzureOptions _azureOptions;
 
 
-        public VideoService(ICloudStorageService azureService, IVideoRepository videoRepository, IMessageQueueService queuePublisher, FFmpegService fFmpegService, IThumbnailRepository thumbnailRepository,
+
+        public VideoService(ICloudStorageService azureService, IVideoRepository videoRepository, IMessageQueueService queuePublisher, FFmpegService fFmpegService, IThumbnailRepository thumbnailRepository,IOptions<AzureOptions>  azureOptions,
         IConfiguration configuration)
         {
             _cloudStorageService = azureService;
@@ -28,14 +32,16 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
             _queuePublisher = queuePublisher;
             _ffmpegService = fFmpegService;
             _thumbnailRepository = thumbnailRepository;
+            _azureOptions = azureOptions.Value ;
         }
 
         public async Task<string> StoreFileAndReturnThumbnailUrlAsync(int totalChunks, string outputFileName, int userId, long fileSize, int EncodingId)
         {
             try
             {
+                string containerName = _azureOptions.ContainerName;
                 // 1. Construct Blob path
-                var blobPath = $"uploads/{outputFileName}";
+                var blobPath = $"{containerName}/{userId}/{outputFileName}";
 
                 // 2. Save metadata in DB
                 var videoMetaData = new VideoMetaData
@@ -57,14 +63,15 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 {
                     FileId = videoMetaData.Id,
                     BlobPath = videoMetaData.BlobPath,  // $"uploads/{outputFileName}"
-                    EncodingProfileId = 9
+                    EncodingProfileId = 1
                 };
 
                 // string queueName = _configuration["AzureServiceBus:TranscodeQueueName"]!;
                 // await _queuePublisher.SendMessageAsync(message, queueName);
 
                 // 3. Generate thumbnail
-                // string thumbnailUrl = await GenerateAndStoreThumbnailAsync(outputFileName, userId, videoMetaData.Id);
+                // string thumbnailUrl = await GenerateDefaultThumbnailAsync(outputFileName, userId, videoMetaData.Id);
+               await _ffmpegService.TranscodeToCMAFAsync(videoMetaData.OriginalFilename,videoMetaData.UserId,videoMetaData.Id);
 
                 return "thumbnailUrl";
             }
@@ -75,57 +82,54 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
             }
         }
 
-        // private async Task<string> GenerateAndStoreThumbnailAsync(string outputFileName, int userId, int videoId)
-        // {
-        //     try
-        //     {
-        //         // 1. Get video blob as stream
-        //         var videoBlobPath = $"uploads/{outputFileName}";
-        //         Console.WriteLine("blob PAth", videoBlobPath);
-        //         var videoStream = await _cloudStorageService.GetBlobStreamAsync(outputFileName);
-            
+        private async Task<string> GenerateDefaultThumbnailAsync(string outputFileName, int userId, int videoId)
+        {
+            try
+            {
+                string SASUrl = await _cloudStorageService.GenerateSasUriAsync(outputFileName);
+                Console.WriteLine(SASUrl);
+                var thumbnailStream = await _ffmpegService.GenerateThumbnailAsync(SASUrl, "00:00:05");
+                // 3. Create thumbnail filename
+                var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(outputFileName);
+                var extention = Path.GetExtension(outputFileName);
+                var thumbnailFileName = $"{fileNameWithoutExtension}_thumb_{userId}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.jpg";
 
-        //         // 2. Generate thumbnail using FFmpeg
-        //         var thumbnailStream = await _ffmpegService.GenerateThumbnailAsync(videoBlobPath, "00:00:05");
+                // 4. Upload thumbnail to blob storage
+                var thumbnailBlobPath = await _cloudStorageService.UploadThumbnailAsync(thumbnailStream, thumbnailFileName);
 
-        //         // 3. Create thumbnail filename
-        //         var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(outputFileName);
-        //         var thumbnailFileName = $"{fileNameWithoutExtension}_thumb_{userId}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.jpg";
+                // 5. Generate SAS URI for thumbnail access (optional - depends on your needs)
+                var thumbnailUrl = _cloudStorageService.GenerateThumbnailSasUri(thumbnailBlobPath);
+                Console.WriteLine(thumbnailUrl);
 
-        //         // 4. Upload thumbnail to blob storage
-        //         var thumbnailBlobPath = await _cloudStorageService.UploadThumbnailAsync(thumbnailStream, thumbnailFileName);
-
-        //         // 5. Generate SAS URI for thumbnail access (optional - depends on your needs)
-        //         var thumbnailUrl = _cloudStorageService.GenerateThumbnailSasUri(thumbnailBlobPath);
-
-        //         Console.WriteLine($"✅ Successfully generated and stored thumbnail: {thumbnailBlobPath}");
-
-        //         var Thumbnail = new Thumbnail
-        //         {
-        //             FileId = videoId,
-        //             IsDefault = true,
-        //             BlobUrl = thumbnailBlobPath,
-        //             TimeOffset = "00:00:05",
-        //             CreatedAt = DateTime.UtcNow
+                Console.WriteLine($"✅ Successfully generated and stored thumbnail: {thumbnailBlobPath}");
+                var Thumbnail = new Thumbnail
+                {
+                    FileId = videoId,
+                    IsDefault = true,
+                    BlobUrl = thumbnailBlobPath,
+                    TimeOffset = "00:00:05",
+                    CreatedAt = DateTime.UtcNow
 
 
 
-        //         };
+                };
 
-        //         await _thumbnailRepository.SaveAsync(Thumbnail);
+                await _thumbnailRepository.SaveAsync(Thumbnail);
+
+                return thumbnailUrl;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("❌ Error in GenerateAndStoreThumbnailAsync: " + ex.Message);
+                throw;
+            }
+        }
 
 
-        //         return thumbnailUrl;
-        //     }
-        //     catch (Exception ex)
-        //     {
-        //         Console.WriteLine("❌ Error in GenerateAndStoreThumbnailAsync: " + ex.Message);
-        //         throw;
-        //     }
-        // }
+        
 
     }
-    
+
 }
 
 

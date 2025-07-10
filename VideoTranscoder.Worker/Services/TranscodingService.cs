@@ -71,11 +71,11 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services{
                     return "fail";
                 }
 
-                using var inputStream = await _cloudStorageService.GetBlobStreamAsync(videoFile.OriginalFilename);
+                // using var inputStream = await _cloudStorageService.GetBlobStreamAsync(videoFile.OriginalFilename);
 
                 try
                 {
-                    // await _ffmpegService.TranscodeAsync(inputStream, "", encodingProfile.FormatType, encodingProfile.FfmpegArgs, encodingProfile.FormatType);
+                    // await _ffmpegService.TranscodeToCMAFAsync(videoFile.OriginalFilename);
                     // _ffmpegService.TranscodeToHlsAsync(inputStream, "", "");
                 }
                 catch (Exception ex)

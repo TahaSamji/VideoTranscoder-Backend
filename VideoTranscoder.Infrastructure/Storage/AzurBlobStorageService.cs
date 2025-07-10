@@ -5,6 +5,7 @@ using Azure.Storage.Sas;
 using Microsoft.Extensions.Options;
 using VideoTranscoder.VideoTranscoder.Application.Configurations;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
+using VideoTranscoder.VideoTranscoder.Application.Services;
 
 namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
 {
@@ -12,28 +13,34 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
     {
         private readonly AzureOptions _azureOptions;
         private readonly BlobServiceClient _blobServiceClient;
+        private readonly IUserService _userService;
 
-        public AzureBlobStorageService(IOptions<AzureOptions> azureOptions, BlobServiceClient blobServiceClient)
+
+
+        public AzureBlobStorageService(IOptions<AzureOptions> azureOptions, BlobServiceClient blobServiceClient, IUserService userService)
         {
             _azureOptions = azureOptions.Value;
             _blobServiceClient = blobServiceClient;
-
+            _userService = userService;
         }
 
-        public async Task<string> GenerateUploadSasUriAsync(string filename)
+        public async Task<string> GenerateSasUriAsync(string fileName)
         {
             try
             {
+                int userId = _userService.UserId;
+                string blobName = $"{userId}/{fileName}";
                 string containerName = _azureOptions.ContainerName;
 
                 var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
                 await containerClient.CreateIfNotExistsAsync();
-                var blobClient = containerClient.GetBlobClient(filename);
+                var blobClient = containerClient.GetBlobClient(blobName);
+
 
                 var sasBuilder = new BlobSasBuilder
                 {
                     BlobContainerName = containerName,
-                    BlobName = filename,
+                    BlobName = blobName,
                     Resource = "b",
                     StartsOn = DateTimeOffset.UtcNow,
                     ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
@@ -52,13 +59,100 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
             }
         }
 
+        public async Task UploadTranscodedOutputAsync(string tempOutputDir, string fileName, int fileId, int userId)
+        {
+            string containerName = _azureOptions.ContainerName;
+            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+            await containerClient.CreateIfNotExistsAsync();
+
+            string[] formats = ["hls", "dash"];
+
+            foreach (var format in formats)
+            {
+                var subDir = Path.Combine(tempOutputDir, format);
+                if (!Directory.Exists(subDir))
+                {
+                    Console.WriteLine($"⚠️ Directory not found: {subDir}");
+                    continue;
+                }
+
+                var files = Directory.GetFiles(subDir, "*", SearchOption.AllDirectories);
+
+                foreach (var localFilePath in files)
+                {
+                    // Create a blob path like: uploads/{fileId}/hls/segment_001.m4s
+                    var relativePath = Path.GetRelativePath(tempOutputDir, localFilePath).Replace("\\", "/");
+                    // var blobPath = $"{fileId}/{relativePath}";
+                    string blobPath = $"{userId}/{fileName}_{fileId}/{relativePath}";
+                    try
+                    {
+                        using var fileStream = File.OpenRead(localFilePath);
+                        var blobClient = containerClient.GetBlobClient(blobPath);
+
+                        await blobClient.UploadAsync(fileStream, overwrite: true);
+
+                        var contentType = Path.GetExtension(blobPath).ToLower() switch
+                        {
+                            ".m3u8" => "application/vnd.apple.mpegurl",
+                            ".mpd" => "application/dash+xml",
+                            ".m4s" => "video/iso.segment",
+                            ".mp4" => "video/mp4",
+                            _ => "application/octet-stream"
+                        };
+
+                        await blobClient.SetHttpHeadersAsync(new BlobHttpHeaders { ContentType = contentType });
+                        Console.WriteLine($"✅ Uploaded: {blobPath}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"❌ Error uploading {blobPath}: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+
+        public async Task<string> DownloadVideoToLocalAsync(string filename, int userId, int fileId)
+        {
+            try
+            {
+                // 1. Generate SAS URL for secure read access
+                var sasUrl = await GenerateSasUriAsync(filename);
+
+                // 2. Define local storage path
+                string currentDir = Directory.GetCurrentDirectory();
+                string inputDir = Path.Combine(currentDir, "input", $"{userId}", $"{fileId}", "videos");
+                Directory.CreateDirectory(inputDir); // Ensure folder exists
+
+                string localFilePath = Path.Combine(inputDir, filename);
+
+                // 3. Download using HttpClient
+                using var httpClient = new HttpClient();
+                using var response = await httpClient.GetAsync(sasUrl, HttpCompletionOption.ResponseHeadersRead);
+
+                response.EnsureSuccessStatusCode(); // Throw if not 200 OK
+
+                await using var fs = new FileStream(localFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
+                await response.Content.CopyToAsync(fs);
+
+                Console.WriteLine($"✅ Downloaded to: {localFilePath}");
+                return localFilePath;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("❌ Error downloading video: " + ex.Message);
+                throw;
+            }
+        }
+
 
         // New method to get blob as stream
         public async Task<Stream> GetBlobStreamAsync(string fileName)
         {
             try
             {
-                var containerClient = _blobServiceClient.GetBlobContainerClient("uploads");
+                string containerName = _azureOptions.ContainerName;
+                var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
                 var blobClient = containerClient.GetBlobClient(fileName);
 
                 if (!await blobClient.ExistsAsync())
@@ -82,11 +176,12 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
         {
             try
             {
-                var containerClient = _blobServiceClient.GetBlobContainerClient("uploads");
+                string containerName = _azureOptions.ContainerName;
+                var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
                 await containerClient.CreateIfNotExistsAsync();
-
+                int userId = _userService.UserId;
                 // Create thumbnail path in thumbnails directory
-                var thumbnailBlobPath = $"thumbnails/{thumbnailFileName}";
+                var thumbnailBlobPath = $"{userId}/thumbnails/{thumbnailFileName}";
                 var blobClient = containerClient.GetBlobClient(thumbnailBlobPath);
 
                 // Upload thumbnail
@@ -114,7 +209,8 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
         {
             try
             {
-                var containerClient = _blobServiceClient.GetBlobContainerClient("uploads");
+                string containerName = _azureOptions.ContainerName;
+                var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
                 var blobClient = containerClient.GetBlobClient(thumbnailBlobPath);
 
                 var sasBuilder = new BlobSasBuilder
@@ -126,7 +222,7 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
                     ExpiresOn = DateTimeOffset.UtcNow.AddHours(hoursExpiry)
                 };
 
-                sasBuilder.SetPermissions(BlobSasPermissions.Read);
+                sasBuilder.SetPermissions(BlobSasPermissions.Read | BlobSasPermissions.Write);
                 var sasUri = blobClient.GenerateSasUri(sasBuilder);
 
                 return sasUri.ToString();
@@ -137,83 +233,12 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
                 throw;
             }
         }
-        // public async Task<string> UploadFileToBlob(string localFilePath, string blobPath)
-        // {
-        //     try
-        //     {
-        //         using var fileStream = File.OpenRead(localFilePath);
-        //         var containerClient = _blobServiceClient.GetBlobContainerClient("uploads");
-        //         var blobClient = containerClient.GetBlobClient(blobPath);
-
-        //         await blobClient.UploadAsync(fileStream, overwrite: true);
-
-        //         // Set appropriate content type
-        //         var contentType = Path.GetExtension(blobPath).ToLower() switch
-        //         {
-        //             ".m3u8" => "application/vnd.apple.mpegurl",
-        //             ".ts" => "video/mp2t",
-        //             _ => "application/octet-stream"
-        //         };
-
-        //         await blobClient.SetHttpHeadersAsync(new BlobHttpHeaders { ContentType = contentType });
-
-        //         Console.WriteLine($"✅ Uploaded: {blobPath}");
-        //         return blobPath;
-        //     }
-        //     catch (Exception ex)
-        //     {
-        //         Console.WriteLine($"❌ Error uploading {blobPath}: {ex.Message}");
-        //         throw;
-        //     }
-        // }
-
-        public async Task<string> UploadFileToBlob(string localFilePath, string blobPath)
-{
-    try
-    {
-        using var fileStream = File.OpenRead(localFilePath);
-        var containerClient = _blobServiceClient.GetBlobContainerClient("uploads");
-        var blobClient = containerClient.GetBlobClient(blobPath);
-
-        await blobClient.UploadAsync(fileStream, overwrite: true);
-
-        // Auto-detect MIME type
-        var extension = Path.GetExtension(blobPath).ToLowerInvariant();
-        var contentType = extension switch
-        {
-            ".m3u8" => "application/vnd.apple.mpegurl",
-            ".ts" => "video/mp2t",
-            ".mp4" => "video/mp4",
-            ".mpd" => "application/dash+xml",
-            ".m4s" => "video/iso.segment",
-            ".webm" => "video/webm",
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".png" => "image/png",
-            ".gif" => "image/gif",
-            ".bmp" => "image/bmp",
-            ".svg" => "image/svg+xml",
-            ".txt" => "text/plain",
-            ".json" => "application/json",
-            _ => "application/octet-stream"
-        };
-
-        await blobClient.SetHttpHeadersAsync(new BlobHttpHeaders
-        {
-            ContentType = contentType
-        });
-
-        Console.WriteLine($"✅ Uploaded: {blobPath} as {contentType}");
-        return blobPath;
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"❌ Error uploading {blobPath}: {ex.Message}");
-        throw;
-    }
-}
 
 
-      
+
+
+
+
     }
 
 

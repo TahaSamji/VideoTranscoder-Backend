@@ -38,15 +38,15 @@ builder.Services.AddSingleton(provider =>
     );
 });
 
-// builder.Services.AddDbContext<AppDbContext>(options =>
-//     options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
-// );
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseMySql(
-        configuration.GetConnectionString("DefaultConnection"),
-        ServerVersion.AutoDetect(configuration.GetConnectionString("DefaultConnection"))
-    )
+    options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
 );
+// builder.Services.AddDbContext<AppDbContext>(options =>
+//     options.UseMySql(
+//         configuration.GetConnectionString("DefaultConnection"),
+//         ServerVersion.AutoDetect(configuration.GetConnectionString("DefaultConnection"))
+//     )
+// );
 
 #endregion
 
@@ -105,7 +105,7 @@ builder.Services.AddSingleton(provider =>
 
 // 🔹 Transcoding Worker & Services
 builder.Services.AddScoped<FFmpegService>();
-builder.Services.AddHostedService<TranscodingWorker>();
+// builder.Services.AddHostedService<TranscodingWorker>();
 builder.Services.AddScoped<ITranscodingService, TranscodingService>();
 builder.Services.AddScoped<IMessageQueueService, AzureServiceBusPublisherService>();
 builder.Services.AddScoped<ICloudStorageService, AzureBlobStorageService>();
@@ -113,6 +113,8 @@ builder.Services.AddScoped<IEncodingProfileRepository, EncodingProfileRepository
 builder.Services.AddScoped<IThumbnailRepository, ThumbnailRepository>();
 builder.Services.AddScoped<ITranscodingJobRepository, TranscodingJobRepository>();
 builder.Services.AddScoped<IEncodingProfileService, EncodingProfileService>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IUserService, UserService>();
 
 
 
