@@ -19,11 +19,11 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
         private readonly IConfiguration _configuration;
         private readonly FFmpegService _ffmpegService;
         private readonly IThumbnailRepository _thumbnailRepository;
-                private readonly AzureOptions _azureOptions;
+        private readonly AzureOptions _azureOptions;
 
 
 
-        public VideoService(ICloudStorageService azureService, IVideoRepository videoRepository, IMessageQueueService queuePublisher, FFmpegService fFmpegService, IThumbnailRepository thumbnailRepository,IOptions<AzureOptions>  azureOptions,
+        public VideoService(ICloudStorageService azureService, IVideoRepository videoRepository, IMessageQueueService queuePublisher, FFmpegService fFmpegService, IThumbnailRepository thumbnailRepository, IOptions<AzureOptions> azureOptions,
         IConfiguration configuration)
         {
             _cloudStorageService = azureService;
@@ -32,7 +32,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
             _queuePublisher = queuePublisher;
             _ffmpegService = fFmpegService;
             _thumbnailRepository = thumbnailRepository;
-            _azureOptions = azureOptions.Value ;
+            _azureOptions = azureOptions.Value;
         }
 
         public async Task<string> StoreFileAndReturnThumbnailUrlAsync(int totalChunks, string outputFileName, int userId, long fileSize, int EncodingId)
@@ -70,10 +70,10 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 // await _queuePublisher.SendMessageAsync(message, queueName);
 
                 // 3. Generate thumbnail
-                // string thumbnailUrl = await GenerateDefaultThumbnailAsync(outputFileName, userId, videoMetaData.Id);
-               await _ffmpegService.TranscodeToCMAFAsync(videoMetaData.OriginalFilename,videoMetaData.UserId,videoMetaData.Id);
+                string thumbnailUrl = await GenerateDefaultThumbnailAsync(outputFileName, userId, videoMetaData.Id);
+                //    await _ffmpegService.TranscodeToCMAFAsync(videoMetaData.OriginalFilename,videoMetaData.UserId,videoMetaData.Id);
 
-                return "thumbnailUrl";
+                return thumbnailUrl;
             }
             catch (Exception ex)
             {
@@ -86,9 +86,11 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
         {
             try
             {
-                string SASUrl = await _cloudStorageService.GenerateSasUriAsync(outputFileName);
-                Console.WriteLine(SASUrl);
-                var thumbnailStream = await _ffmpegService.GenerateThumbnailAsync(SASUrl, "00:00:05");
+                // string SASUrl = await _cloudStorageService.GenerateSasUriAsync(outputFileName);
+                // Console.WriteLine(SASUrl);
+                // var thumbnailStream = await _ffmpegService.GenerateThumbnailAsync(SASUrl, "00:00:05");
+                var thumbnailStream = await _ffmpegService.GenerateThumbnailFromDirAsync( "00:00:05",outputFileName,userId,videoId);
+
                 // 3. Create thumbnail filename
                 var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(outputFileName);
                 var extention = Path.GetExtension(outputFileName);
@@ -126,7 +128,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
         }
 
 
-        
+
 
     }
 

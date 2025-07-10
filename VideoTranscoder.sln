@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VideoTranscoder", "VideoTranscoder.csproj", "{02A7C5CB-10B9-B54D-4911-2956246142CA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{02A7C5CB-10B9-B54D-4911-2956246142CA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{02A7C5CB-10B9-B54D-4911-2956246142CA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{02A7C5CB-10B9-B54D-4911-2956246142CA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{02A7C5CB-10B9-B54D-4911-2956246142CA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {111E47A3-7BFF-4172-9487-41E9189FC6B0}
+	EndGlobalSection
+EndGlobal

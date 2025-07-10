@@ -29,8 +29,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
 
             try
             {
-                string currentDir = Directory.GetCurrentDirectory();
-                 var outputDir = Path.Combine(currentDir, "");
+
                 // here
                 // FFmpeg command to generate thumbnail at specific time
                 var ultraFastArgs = $"-ss {time} -i \"{sasUrl}\" -vframes 1 -f image2pipe -vcodec mjpeg -q:v 2 -an -vf scale=1280:720 pipe:1";
@@ -73,12 +72,12 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                 throw;
             }
         }
-        public async Task TranscodeToCMAFAsync(string filename,int userId,int fileId)
+        public async Task TranscodeToCMAFAsync(string filename, int userId, int fileId)
         {
             // Ensure output directory exists
 
             string currentDir = Directory.GetCurrentDirectory();
-            var outputDir = Path.Combine(currentDir, "temp", $"{userId}",$"{fileId}","output");
+            var outputDir = Path.Combine(currentDir, "temp", $"{userId}", $"{fileId}", "output");
             Directory.CreateDirectory(outputDir);
             // Create subdirectories for HLS and DASH
             string hlsDir = Path.Combine(outputDir, "hls");
@@ -86,7 +85,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
 
             Directory.CreateDirectory(hlsDir);
             Directory.CreateDirectory(dashDir);
-            string inputPath = await _cloudStorageService.DownloadVideoToLocalAsync(filename,userId,fileId);
+            string inputPath = await _cloudStorageService.DownloadVideoToLocalAsync(filename, userId, fileId);
 
             // Prepare output filenames
             // var hlsOutput = Path.Combine(outputDir, "playlist.m3u8");
@@ -124,7 +123,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             // NOTE: Add HLS CMAF support if needed (requires separate FFmpeg run, or use Shaka Packager for both at once)
 
             await RunFFmpegAsync(args);
-            await _cloudStorageService.UploadTranscodedOutputAsync(outputDir,filename,fileId,userId);
+            await _cloudStorageService.UploadTranscodedOutputAsync(outputDir, filename, fileId, userId);
         }
 
         private async Task RunFFmpegAsync(string args)
@@ -149,6 +148,63 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             if (process.ExitCode != 0)
             {
                 throw new Exception($"FFmpeg failed:\n{stderr}");
+            }
+        }
+
+        public async Task<Stream> GenerateThumbnailFromDirAsync(string time, string fileName, int userId, int fileId)
+        {
+
+            if (string.IsNullOrEmpty(time))
+                throw new ArgumentException("Time cannot be null or empty", nameof(time));
+            var thumbnailStream = new MemoryStream();
+            try
+            {
+                // Create a memory stream to capture the thumbnail
+
+                // string currentDir = Directory.GetCurrentDirectory();
+                // var outputDir = Path.Combine(currentDir, "temp", $"{userId}", $"{fileId}", "thumbnails");
+                // Directory.CreateDirectory(outputDir);
+                string inputPath = await _cloudStorageService.DownloadVideoToLocalAsync(fileName, userId, fileId);
+                // here
+                // FFmpeg command to generate thumbnail at specific time
+                var ultraFastArgs = $"-ss {time} -i \"{inputPath}\" -vframes 1 -f image2pipe -vcodec mjpeg -q:v 2 -an -vf scale=1280:720 pipe:1";
+                var processStartInfo = new ProcessStartInfo
+                {
+                    FileName = "ffmpeg",
+                    Arguments = ultraFastArgs,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                using (var process = new Process { StartInfo = processStartInfo })
+                {
+                    process.Start();
+
+                    // Copy FFmpeg output (PNG image) to memory stream
+                    await process.StandardOutput.BaseStream.CopyToAsync(thumbnailStream);
+
+                    // Wait for process to complete
+                    await process.WaitForExitAsync();
+
+                    if (process.ExitCode != 0)
+                    {
+                        var error = await process.StandardError.ReadToEndAsync();
+                        throw new InvalidOperationException($"FFmpeg failed with exit code {process.ExitCode}: {error}");
+                    }
+                }
+
+                // Reset stream position for reading
+                thumbnailStream.Position = 0;
+
+                return thumbnailStream;
+            }
+            catch
+            {
+                // Clean up memory stream if there's an error
+                thumbnailStream?.Dispose();
+                throw;
             }
         }
     }
