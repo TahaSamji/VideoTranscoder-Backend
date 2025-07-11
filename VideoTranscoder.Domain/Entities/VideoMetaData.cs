@@ -14,7 +14,6 @@ namespace VideoTranscoder.VideoTranscoder.Domain.Entities
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
 
-        public int? EncodingProfileId { get; set; }
 
         public List<Thumbnail> Thumbnails { get; set; }
     }

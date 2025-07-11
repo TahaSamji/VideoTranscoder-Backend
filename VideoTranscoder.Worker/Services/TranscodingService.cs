@@ -4,7 +4,8 @@ using VideoTranscoder.VideoTranscoder.Application.DTOs;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
 using VideoTranscoder.VideoTranscoder.Domain.Entities;
 
-namespace VideoTranscoder.VideoTranscoder.Worker.Services{
+namespace VideoTranscoder.VideoTranscoder.Worker.Services
+{
     public class TranscodingService : ITranscodingService
     {
         private readonly IVideoRepository _videoRepository;
@@ -13,6 +14,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services{
         private readonly FFmpegService _ffmpegService;
         private readonly ILogger<TranscodingService> _logger;
         private readonly ICloudStorageService _cloudStorageService;
+        private readonly IVideoVariantRepository _videoVariantRepository;
 
 
         public TranscodingService(
@@ -21,12 +23,14 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services{
         ITranscodingJobRepository transcodingJobRepository,
         FFmpegService ffmpegService,
         ICloudStorageService cloudStorageService,
+         IVideoVariantRepository videoVariantRepository,
         ILogger<TranscodingService> logger)
         {
             _videoRepository = videoRepository;
             _encodingProfileRepository = encodingProfileRepository;
             _transcodingJobRepository = transcodingJobRepository;
             _logger = logger;
+            _videoVariantRepository = videoVariantRepository;
             _ffmpegService = ffmpegService;
             _cloudStorageService = cloudStorageService;
         }
@@ -48,10 +52,10 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services{
                 }
 
                 // === CREATE JOB FOR IDEMPOTENCY ===
-                var existingJob = await _transcodingJobRepository.GetByFileAndProfileAsync(request.FileId, request.EncodingProfileId);
-                if (existingJob == null)
+                var Job = await _transcodingJobRepository.GetByFileAndProfileAsync(request.FileId, request.EncodingProfileId);
+                if (Job == null)
                 {
-                    var newJob = new TranscodingJob
+                    Job = new TranscodingJob
                     {
                         BlobPath = "",
                         VideoFileId = request.FileId,
@@ -62,12 +66,12 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services{
 
                     };
 
-                    await _transcodingJobRepository.SaveAsync(newJob);
-                    _logger.LogInformation("✅ Created new transcoding job (ID: {JobId})", newJob.Id);
+                    await _transcodingJobRepository.SaveAsync(Job);
+                    _logger.LogInformation("✅ Created new transcoding job (ID: {JobId})", Job.Id);
                 }
                 else
                 {
-                    _logger.LogInformation("ℹ️ Transcoding job already exists (ID: {JobId})", existingJob.Id);
+                    _logger.LogInformation("ℹ️ Transcoding job already exists (ID: {JobId})", Job.Id);
                     return "fail";
                 }
 
@@ -75,8 +79,34 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services{
 
                 try
                 {
-                    // await _ffmpegService.TranscodeToCMAFAsync(videoFile.OriginalFilename);
-                    // _ffmpegService.TranscodeToHlsAsync(inputStream, "", "");
+                    string videoBlobpath = await _ffmpegService.TranscodeToCMAFAsync(videoFile.OriginalFilename, videoFile.UserId, videoFile.Id, encodingProfile);
+                    string outputfile = "";
+                    if (encodingProfile.FormatType == "hls")
+                    {
+                        outputfile = "playlist.m3u8";
+                    }
+                    else
+                    {
+                        outputfile = "manifest.mpd";
+                    }
+                    var variant = new VideoVariant
+                    {
+                        TranscodingJobId = Job.Id,
+                        Type = encodingProfile.FormatType,
+                        BlobPath = videoBlobpath, // or manifest.mpd
+                        Resolution = encodingProfile.Resolution,
+                        BitrateKbps = encodingProfile.Bitrate,
+                        Size = 0, // Optional: use ICloudStorageService to get blob size
+                        DurationSeconds = 0, // Optional: extract from metadata if needed
+                        CreatedAt = DateTime.UtcNow,
+                        VideoURL = $"https://task1storageaccount.blob.core.windows.net/uploads/{videoBlobpath}/{encodingProfile.FormatType}/{outputfile}" // or manifest.mpd
+                    };
+
+                    await _videoVariantRepository.SaveAsync(variant);
+                    _logger.LogInformation("🎞️ Video variant saved.");
+                    await _ffmpegService.GenerateMultipleThumbnailsAsync(videoFile.OriginalFilename,videoFile.UserId,videoFile.Id);
+
+
                 }
                 catch (Exception ex)
                 {

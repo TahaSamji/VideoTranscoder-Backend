@@ -1,4 +1,5 @@
 
+using Microsoft.EntityFrameworkCore;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
 using VideoTranscoder.VideoTranscoder.Domain.DatabaseContext;
 using VideoTranscoder.VideoTranscoder.Domain.Entities;
@@ -19,10 +20,16 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Persistance
             _dbContext.VideoMetaDatas.Add(file);
             await _dbContext.SaveChangesAsync();
         }
-          public async Task<VideoMetaData?> GetByIdAsync(int id)
+        public async Task<VideoMetaData?> GetByIdAsync(int id)
         {
             return await _dbContext.VideoMetaDatas.FindAsync(id);
         }
 
+        public async Task<VideoMetaData?> FindByNameAndSizeAsync(string name, long size, int userId)
+        {
+            return await _dbContext.VideoMetaDatas
+                .Where(v => v.OriginalFilename == name && v.Size == size && v.UserId == userId)
+                .FirstOrDefaultAsync();
+        }
     }
 }

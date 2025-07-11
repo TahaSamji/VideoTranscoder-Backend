@@ -20,10 +20,11 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
         private readonly FFmpegService _ffmpegService;
         private readonly IThumbnailRepository _thumbnailRepository;
         private readonly AzureOptions _azureOptions;
+        private readonly IEncodingProfileRepository _encodingProfileRepository;
 
 
 
-        public VideoService(ICloudStorageService azureService, IVideoRepository videoRepository, IMessageQueueService queuePublisher, FFmpegService fFmpegService, IThumbnailRepository thumbnailRepository, IOptions<AzureOptions> azureOptions,
+        public VideoService(ICloudStorageService azureService, IEncodingProfileRepository encodingProfileRepository, IVideoRepository videoRepository, IMessageQueueService queuePublisher, FFmpegService fFmpegService, IThumbnailRepository thumbnailRepository, IOptions<AzureOptions> azureOptions,
         IConfiguration configuration)
         {
             _cloudStorageService = azureService;
@@ -33,45 +34,46 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
             _ffmpegService = fFmpegService;
             _thumbnailRepository = thumbnailRepository;
             _azureOptions = azureOptions.Value;
+            _encodingProfileRepository = encodingProfileRepository;
         }
 
         public async Task<string> StoreFileAndReturnThumbnailUrlAsync(int totalChunks, string outputFileName, int userId, long fileSize, int EncodingId)
         {
             try
             {
-                string containerName = _azureOptions.ContainerName;
-                // 1. Construct Blob path
-                var blobPath = $"{containerName}/{userId}/{outputFileName}";
-
-                // 2. Save metadata in DB
-                var videoMetaData = new VideoMetaData
+                // Step 1: Check for existing video
+                var videoMetaData = await _videoRepository.FindByNameAndSizeAsync(outputFileName, fileSize, userId);
+                if (videoMetaData == null)
                 {
+                    string containerName = _azureOptions.ContainerName;
+                    var blobPath = $"{containerName}/{userId}/{outputFileName}";
 
-                    UserId = userId,
-                    OriginalFilename = outputFileName,
-                    BlobPath = blobPath,
-                    Status = "Merged",
-                    Size = fileSize,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow,
-                    EncodingProfileId = EncodingId
-                };
+                    videoMetaData = new VideoMetaData
+                    {
+                        UserId = userId,
+                        OriginalFilename = outputFileName,
+                        BlobPath = blobPath,
+                        Status = "Merged",
+                        Size = fileSize,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow,
+                    };
+
+                    await _videoRepository.SaveAsync(videoMetaData);
+                }
 
 
-                await _videoRepository.SaveAsync(videoMetaData);
                 var message = new TranscodeRequestMessage
                 {
                     FileId = videoMetaData.Id,
-                    BlobPath = videoMetaData.BlobPath,  // $"uploads/{outputFileName}"
-                    EncodingProfileId = 1
+                    BlobPath = videoMetaData.BlobPath,
+                    EncodingProfileId = EncodingId
                 };
 
+                string thumbnailUrl = await GenerateDefaultThumbnailAsync(outputFileName, userId, videoMetaData.Id);
                 // string queueName = _configuration["AzureServiceBus:TranscodeQueueName"]!;
                 // await _queuePublisher.SendMessageAsync(message, queueName);
-
-                // 3. Generate thumbnail
-                string thumbnailUrl = await GenerateDefaultThumbnailAsync(outputFileName, userId, videoMetaData.Id);
-                //    await _ffmpegService.TranscodeToCMAFAsync(videoMetaData.OriginalFilename,videoMetaData.UserId,videoMetaData.Id);
+                await _ffmpegService.GenerateMultipleThumbnailsAsync(videoMetaData.OriginalFilename,userId,videoMetaData.Id);
 
                 return thumbnailUrl;
             }
@@ -82,6 +84,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
             }
         }
 
+
         private async Task<string> GenerateDefaultThumbnailAsync(string outputFileName, int userId, int videoId)
         {
             try
@@ -89,7 +92,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 // string SASUrl = await _cloudStorageService.GenerateSasUriAsync(outputFileName);
                 // Console.WriteLine(SASUrl);
                 // var thumbnailStream = await _ffmpegService.GenerateThumbnailAsync(SASUrl, "00:00:05");
-                var thumbnailStream = await _ffmpegService.GenerateThumbnailFromDirAsync( "00:00:05",outputFileName,userId,videoId);
+                var thumbnailStream = await _ffmpegService.GenerateThumbnailFromDirAsync("00:00:05", outputFileName, userId, videoId);
 
                 // 3. Create thumbnail filename
                 var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(outputFileName);
@@ -111,9 +114,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                     BlobUrl = thumbnailBlobPath,
                     TimeOffset = "00:00:05",
                     CreatedAt = DateTime.UtcNow
-
-
-
+                    
                 };
 
                 await _thumbnailRepository.SaveAsync(Thumbnail);

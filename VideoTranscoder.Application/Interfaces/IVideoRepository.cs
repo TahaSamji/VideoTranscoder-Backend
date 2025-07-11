@@ -6,6 +6,8 @@ namespace VideoTranscoder.VideoTranscoder.Application.Interfaces
     {
         Task SaveAsync(VideoMetaData data);
         Task<VideoMetaData?> GetByIdAsync(int id);
+        Task<VideoMetaData?> FindByNameAndSizeAsync(string name, long size, int userId);
+
     }
 
 }

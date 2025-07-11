@@ -59,13 +59,14 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
             }
         }
 
-        public async Task UploadTranscodedOutputAsync(string tempOutputDir, string fileName, int fileId, int userId)
+        public async Task<string> UploadTranscodedOutputAsync(string tempOutputDir, string fileName, int fileId, int userId, int encodingProfileId)
         {
             string containerName = _azureOptions.ContainerName;
             var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
             await containerClient.CreateIfNotExistsAsync();
 
             string[] formats = ["hls", "dash"];
+            string? firstUploadedBlobPath = null;
 
             foreach (var format in formats)
             {
@@ -77,13 +78,14 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
                 }
 
                 var files = Directory.GetFiles(subDir, "*", SearchOption.AllDirectories);
+                string transcodedPath = $"{userId}/{fileName}_{fileId}_{encodingProfileId}";
 
                 foreach (var localFilePath in files)
                 {
-                    // Create a blob path like: uploads/{fileId}/hls/segment_001.m4s
                     var relativePath = Path.GetRelativePath(tempOutputDir, localFilePath).Replace("\\", "/");
-                    // var blobPath = $"{fileId}/{relativePath}";
-                    string blobPath = $"{userId}/{fileName}_{fileId}/{relativePath}";
+                    string blobPath = $"{userId}/{fileName}_{fileId}_{encodingProfileId}/{relativePath}";
+
+
                     try
                     {
                         using var fileStream = File.OpenRead(localFilePath);
@@ -102,14 +104,22 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
 
                         await blobClient.SetHttpHeadersAsync(new BlobHttpHeaders { ContentType = contentType });
                         Console.WriteLine($"✅ Uploaded: {blobPath}");
+
+                        // Store first uploaded blob path
+                        firstUploadedBlobPath ??= transcodedPath;
                     }
                     catch (Exception ex)
                     {
                         Console.WriteLine($"❌ Error uploading {blobPath}: {ex.Message}");
+                        throw;
                     }
                 }
             }
+
+            // Ensure something is returned
+            return firstUploadedBlobPath ?? throw new Exception("❌ No files uploaded.");
         }
+
 
 
         public async Task<string> DownloadVideoToLocalAsync(string filename, int userId, int fileId)
@@ -121,7 +131,7 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
 
                 // 2. Define local storage path
                 string currentDir = Directory.GetCurrentDirectory();
-                string inputDir = Path.Combine(currentDir, "input", $"{userId}", $"{fileId}", "videos");
+                string inputDir = Path.Combine(currentDir, "input2", $"{userId}", $"{fileId}", "videos");
                 Directory.CreateDirectory(inputDir); // Ensure folder exists
 
                 string localFilePath = Path.Combine(inputDir, filename);
@@ -145,31 +155,6 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
             }
         }
 
-
-        // New method to get blob as stream
-        public async Task<Stream> GetBlobStreamAsync(string fileName)
-        {
-            try
-            {
-                string containerName = _azureOptions.ContainerName;
-                var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
-                var blobClient = containerClient.GetBlobClient(fileName);
-
-                if (!await blobClient.ExistsAsync())
-                {
-                    throw new FileNotFoundException($"Blob not found: {fileName}");
-                }
-
-                var response = await blobClient.OpenReadAsync();
-                Console.WriteLine($"✅ Opened blob stream for: {fileName}");
-                return response;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("❌ Error in GetBlobStreamAsync: " + ex.Message);
-                throw;
-            }
-        }
 
         // New method to upload thumbnail to blob storage
         public async Task<string> UploadThumbnailAsync(Stream thumbnailStream, string thumbnailFileName)

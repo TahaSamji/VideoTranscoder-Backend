@@ -31,7 +31,6 @@ namespace VideoTranscoder.VideoTranscoder.Domain.DatabaseContext
             modelBuilder.Entity<VideoMetaData>()
                 .HasOne<EncodingProfile>()
                 .WithMany()
-                .HasForeignKey(v => v.EncodingProfileId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<TranscodingJob>()
