@@ -31,5 +31,37 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Persistance
                 .Where(v => v.OriginalFilename == name && v.Size == size && v.UserId == userId)
                 .FirstOrDefaultAsync();
         }
+
+        public async Task<List<VideoMetaData>> GetAllByUserIdAsync(int userId, int page, int pageSize)
+        {
+            return await _dbContext.VideoMetaDatas
+       .Where(v => v.UserId == userId)
+       .OrderByDescending(v => v.CreatedAt)
+       .Skip((page - 1) * pageSize)
+       .Take(pageSize)
+       .ToListAsync();
+        }
+
+        public async Task UpdateThumbnailUrlAsync(int videoId, string thumbnailUrl)
+        {
+            var video = await _dbContext.VideoMetaDatas.FindAsync(videoId);
+            if (video != null)
+            {
+                video.defaultThumbnailUrl = thumbnailUrl;
+                video.UpdatedAt = DateTime.UtcNow;
+                await _dbContext.SaveChangesAsync();
+            }
+        }
+
+        public async Task UpdateStatusAsync(int videoId, string newStatus)
+        {
+            var video = await _dbContext.VideoMetaDatas.FindAsync(videoId);
+            if (video != null)
+            {
+                video.Status = newStatus;
+                video.UpdatedAt = DateTime.UtcNow;
+                await _dbContext.SaveChangesAsync();
+            }
+        }
     }
 }

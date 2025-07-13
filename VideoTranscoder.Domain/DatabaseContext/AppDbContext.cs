@@ -22,10 +22,10 @@ namespace VideoTranscoder.VideoTranscoder.Domain.DatabaseContext
                 .HasForeignKey(v => v.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<VideoMetaData>()
-                .HasMany(v => v.Thumbnails)
-                .WithOne()
-                .HasForeignKey(t => t.FileId)
+                 modelBuilder.Entity<VideoVariant>()
+                .HasOne(v => v.TranscodingJob)
+                .WithMany() // or .WithMany(j => j.VideoVariants) if you have a collection in TranscodingJob
+                .HasForeignKey(v => v.TranscodingJobId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<VideoMetaData>()
@@ -45,11 +45,6 @@ namespace VideoTranscoder.VideoTranscoder.Domain.DatabaseContext
                 .HasForeignKey(j => j.EncodingProfileId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<VideoVariant>()
-                .HasOne<TranscodingJob>()
-                .WithMany()
-                .HasForeignKey(v => v.TranscodingJobId)
-                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

@@ -14,6 +14,7 @@ using VideoTranscoder.VideoTranscoder.Infrastructure.Queues;
 using VideoTranscoder.VideoTranscoder.Infrastructure.Storage;
 using VideoTranscoder.VideoTranscoder.Infrastructure.Persistance;
 using VideoTranscoder.VideoTranscoder.Domain.DatabaseContext;
+using Microsoft.Extensions.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
@@ -23,6 +24,10 @@ var configuration = builder.Configuration;
 // 🔹 Azure Blob Options
 builder.Services.Configure<AzureOptions>(
     configuration.GetSection("AzureOptions")
+);
+
+builder.Services.Configure<CDNOptions>(
+    builder.Configuration.GetSection("CDNOptions")
 );
 
 // 🔹 BlobServiceClient (for Azure Storage)
@@ -38,15 +43,15 @@ builder.Services.AddSingleton(provider =>
     );
 });
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
-);
 // builder.Services.AddDbContext<AppDbContext>(options =>
-//     options.UseMySql(
-//         configuration.GetConnectionString("DefaultConnection"),
-//         ServerVersion.AutoDetect(configuration.GetConnectionString("DefaultConnection"))
-//     )
+//     options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
 // );
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseMySql(
+        configuration.GetConnectionString("DefaultConnection"),
+        ServerVersion.AutoDetect(configuration.GetConnectionString("DefaultConnection"))
+    )
+);
 
 #endregion
 
@@ -104,8 +109,13 @@ builder.Services.AddSingleton(provider =>
 });
 
 // 🔹 Transcoding Worker & Services
+// Register AutoMapper with configuration
+builder.Services.AddAutoMapper(cfg => {
+    cfg.AddProfile<ThumbnailMapper>();
+});
 builder.Services.AddScoped<FFmpegService>();
-// builder.Services.AddHostedService<TranscodingWorker>();
+builder.Services.AddScoped<LocalCleanerService>();
+builder.Services.AddHostedService<TranscodingWorker>();
 builder.Services.AddScoped<ITranscodingService, TranscodingService>();
 builder.Services.AddScoped<IMessageQueueService, AzureServiceBusPublisherService>();
 builder.Services.AddScoped<ICloudStorageService, AzureBlobStorageService>();
@@ -116,6 +126,11 @@ builder.Services.AddScoped<IVideoVariantRepository, VideoVariantRepository>();
 builder.Services.AddScoped<IEncodingProfileService, EncodingProfileService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IThumbnailService, ThumbnailService>();
+builder.Services.AddScoped<IEncryptionService, CencEncryptionService>();
+builder.Services.AddScoped<ICDNService, AzureCDNService>();
+
+
 
 
 

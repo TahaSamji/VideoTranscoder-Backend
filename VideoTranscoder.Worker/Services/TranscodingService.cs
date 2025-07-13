@@ -1,5 +1,7 @@
 
 using System.Diagnostics;
+using Microsoft.Extensions.Options;
+using VideoTranscoder.VideoTranscoder.Application.Configurations;
 using VideoTranscoder.VideoTranscoder.Application.DTOs;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
 using VideoTranscoder.VideoTranscoder.Domain.Entities;
@@ -12,8 +14,11 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
         private readonly IEncodingProfileRepository _encodingProfileRepository;
         private readonly ITranscodingJobRepository _transcodingJobRepository;
         private readonly FFmpegService _ffmpegService;
+        private readonly AzureOptions _azureOptions;
+        private readonly IThumbnailService _thumbnailService;
         private readonly ILogger<TranscodingService> _logger;
-        private readonly ICloudStorageService _cloudStorageService;
+        private readonly ICDNService _CDNService;
+        private readonly LocalCleanerService _cleanerService;
         private readonly IVideoVariantRepository _videoVariantRepository;
 
 
@@ -22,8 +27,12 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
         IEncodingProfileRepository encodingProfileRepository,
         ITranscodingJobRepository transcodingJobRepository,
         FFmpegService ffmpegService,
+        IOptions<AzureOptions> azureOptions,
+        IThumbnailService thumbnailService,
         ICloudStorageService cloudStorageService,
          IVideoVariantRepository videoVariantRepository,
+         ICDNService CDNService,
+        LocalCleanerService cleanerService,
         ILogger<TranscodingService> logger)
         {
             _videoRepository = videoRepository;
@@ -32,12 +41,16 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             _logger = logger;
             _videoVariantRepository = videoVariantRepository;
             _ffmpegService = ffmpegService;
-            _cloudStorageService = cloudStorageService;
+            _CDNService = CDNService;
+            _thumbnailService = thumbnailService;
+            _azureOptions = azureOptions.Value;
+            _cleanerService = cleanerService;
+
         }
 
         public async Task<string> TranscodeVideoAsync(TranscodeRequestMessage request, CancellationToken cancellationToken = default)
         {
-            var stopwatch = Stopwatch.StartNew();
+
 
             try
             {
@@ -60,7 +73,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                         BlobPath = "",
                         VideoFileId = request.FileId,
                         EncodingProfileId = request.EncodingProfileId,
-                        Status = "Pending",
+                        Status = "Queued",
                         CreatedAt = DateTime.UtcNow,
                         ErrorMessage = ""
 
@@ -80,6 +93,8 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                 try
                 {
                     string videoBlobpath = await _ffmpegService.TranscodeToCMAFAsync(videoFile.OriginalFilename, videoFile.UserId, videoFile.Id, encodingProfile);
+
+                    await _transcodingJobRepository.UpdateStatusAsync(Job.Id, "Completed");
                     string outputfile = "";
                     if (encodingProfile.FormatType == "hls")
                     {
@@ -89,8 +104,11 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                     {
                         outputfile = "manifest.mpd";
                     }
+                    string storagePath = $"{_azureOptions.ContainerName}/{videoBlobpath}/{encodingProfile.FormatType}/{outputfile}";
+                    string videoUrl = await _CDNService.GenerateSignedUrlAsync(storagePath);
                     var variant = new VideoVariant
                     {
+
                         TranscodingJobId = Job.Id,
                         Type = encodingProfile.FormatType,
                         BlobPath = videoBlobpath, // or manifest.mpd
@@ -99,13 +117,20 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                         Size = 0, // Optional: use ICloudStorageService to get blob size
                         DurationSeconds = 0, // Optional: extract from metadata if needed
                         CreatedAt = DateTime.UtcNow,
-                        VideoURL = $"https://task1storageaccount.blob.core.windows.net/uploads/{videoBlobpath}/{encodingProfile.FormatType}/{outputfile}" // or manifest.mpd
+                        VideoURL = videoUrl // or manifest.mpd
                     };
 
                     await _videoVariantRepository.SaveAsync(variant);
                     _logger.LogInformation("🎞️ Video variant saved.");
-                    await _ffmpegService.GenerateMultipleThumbnailsAsync(videoFile.OriginalFilename,videoFile.UserId,videoFile.Id);
+                    int thumbnailCount = await _thumbnailService.CountThumbnailsForFileAsync(videoFile.Id);
+                    if (thumbnailCount < 6)
+                    {
+                        await _thumbnailService.GenerateAndStoreThumbnailsAsync(videoFile.OriginalFilename, videoFile.UserId, videoFile.Id);
+                        _logger.LogInformation("Thumbnails Saved .");
+                    }
 
+                    await _cleanerService.CleanDirectoryContentsAsync("temp");
+                    await _cleanerService.CleanDirectoryContentsAsync("input");
 
                 }
                 catch (Exception ex)

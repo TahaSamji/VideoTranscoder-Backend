@@ -9,11 +9,14 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
     {
         private readonly ILogger<FFmpegService> _logger;
         private readonly ICloudStorageService _cloudStorageService;
+         private readonly IEncryptionService _encyptionService;
 
-        public FFmpegService(ILogger<FFmpegService> logger, ICloudStorageService cloudStorageService)
+
+        public FFmpegService(ILogger<FFmpegService> logger,IEncryptionService encyptionService, ICloudStorageService cloudStorageService)
         {
             _logger = logger;
             _cloudStorageService = cloudStorageService;
+            _encyptionService = encyptionService;
         }
 
         public async Task<string> TranscodeToCMAFAsync(string filename, int userId, int fileId, EncodingProfile encodingProfile)
@@ -55,6 +58,55 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             await RunFFmpegAsync(ffmpegArgs);
             return await _cloudStorageService.UploadTranscodedOutputAsync(outputDir, filename, fileId, userId, encodingProfile.Id);
         }
+
+        // public async Task<string> TranscodeToCMAFWithCENCAsync(string filename, int userId, int fileId, EncodingProfile encodingProfile)
+        // {
+        //     // Ensure output directory exists
+        //     string currentDir = Directory.GetCurrentDirectory();
+        //     var outputDir = Path.Combine(currentDir, "temp", $"{userId}", $"{fileId}", $"{encodingProfile.Id}", "output");
+        //     Directory.CreateDirectory(outputDir);
+
+        //     // Create subdirectories for HLS and DASH
+        //     string hlsDir = Path.Combine(outputDir, "hls");
+        //     string dashDir = Path.Combine(outputDir, "dash");
+
+        //     Directory.CreateDirectory(hlsDir);
+        //     Directory.CreateDirectory(dashDir);
+
+        //     // string inputPath = await _cloudStorageService.DownloadVideoToLocalAsync(filename, userId, fileId);
+        //     // string inputPath = Path.Combine(currentDir, "input", $"{userId}", $"{fileId}", "videos", filename);
+        //     string inputPath = Path.Combine(currentDir, "input", "1", "1", "videos", "newvid.mp4");
+
+        //     // Build FFmpeg command based on profile type
+        //     // string ffmpegArgs;
+        //     // if (encodingProfile.FormatType?.ToLower() == "dash")
+        //     // {
+        //     //     ffmpegArgs = $"-y -i \"{inputPath}\" {encodingProfile.FfmpegArgs} \"{dashDir}/manifest.mpd\"";
+        //     // }
+        //     // else if (encodingProfile.FormatType?.ToLower() == "hls")
+        //     // {
+        //     //     ffmpegArgs = $"-y -i \"{inputPath}\" {encodingProfile.FfmpegArgs} " +
+        //     //                  $"-hls_segment_filename \"{hlsDir}/segment_%03d.m4s\" " +
+        //     //                  $"\"{hlsDir}/playlist.m3u8\"";
+        //     // }
+        //     // else
+        //     // {
+        //     //     throw new InvalidOperationException($"Unsupported encoding profile type: {encodingProfile.FormatType}");
+        //     // }
+        //     // string ffmpegArgs = $"-y -i \"{inputPath}\" " +
+        //     //         "-c:v libx264 -b:v 3000k -s 854x480 -r 30 -preset medium -crf 23 -g 60 -keyint_min 60 -sc_threshold 0 " +
+        //     //         "-c:a aac -b:a 128k " +
+        //     //         "-movflags +faststart " +
+        //     //         $"\"{dashDir}/output_encoded.mp4\"";
+
+        //     // Console.WriteLine("🎬 FFmpeg Args: " + ffmpegArgs);
+
+        //     // await RunFFmpegAsync(ffmpegArgs);
+        //     await _encyptionService.EncryptToHLSWithCENCAsync(dashDir,userId,fileId,encodingProfile);
+        //     _logger.LogInformation("Dome witn encytption"); 
+        //     // return await _cloudStorageService.UploadTranscodedOutputAsync(outputDir, filename, fileId, userId, encodingProfile.Id);
+        //     return "done";
+        // }
 
 
         private async Task RunFFmpegAsync(string args)
@@ -138,7 +190,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                 throw;
             }
         }
-        public async Task GenerateMultipleThumbnailsAsync(string fileName, int userId, int fileId)
+        public async Task<string> GenerateMultipleThumbnailsAsync(string fileName, int userId, int fileId)
         {
             try
             {
@@ -147,7 +199,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                 Directory.CreateDirectory(thumbnailDir);
 
                 // 1. Download video to local path
-                string inputPath = Path.Combine(currentDir, "input2", $"{userId}", $"{fileId}", "videos", fileName);
+                string inputPath = Path.Combine(currentDir, "input", $"{userId}", $"{fileId}", "videos", fileName);
 
                 // Check if input file exists
                 if (!File.Exists(inputPath))
@@ -190,8 +242,9 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                 {
                     throw new InvalidOperationException("No thumbnails were generated");
                 }
-
                 Console.WriteLine($"✅ Generated {createdThumbnails.Length} thumbnails in: {thumbnailDir}");
+
+                return thumbnailDir;
             }
             catch (Exception ex)
             {
@@ -200,44 +253,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             }
         }
 
-        private async Task<double> GetVideoDurationAsync(string inputPath)
-        {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "ffprobe",
-                Arguments = $"-v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"{inputPath}\"",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
 
-            using var process = new Process { StartInfo = psi };
-            process.Start();
-
-            string output = await process.StandardOutput.ReadToEndAsync();
-            await process.WaitForExitAsync();
-
-            if (double.TryParse(output.Trim(), out double duration))
-                return duration;
-
-            throw new InvalidOperationException("Failed to get video duration.");
-        }
-
-        private List<string> GetEvenTimestamps(double duration, int count)
-        {
-            var timestamps = new List<string>();
-            double interval = duration / (count + 1);
-
-            for (int i = 1; i <= count; i++)
-            {
-                double seconds = interval * i;
-                TimeSpan time = TimeSpan.FromSeconds(seconds);
-                timestamps.Add(time.ToString(@"hh\:mm\:ss"));
-            }
-
-            return timestamps;
-        }
 
 
     }

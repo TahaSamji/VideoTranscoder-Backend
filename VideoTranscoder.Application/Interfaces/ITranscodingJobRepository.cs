@@ -7,6 +7,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Interfaces
         Task SaveAsync(TranscodingJob job);
         Task<TranscodingJob?> GetByFileAndProfileAsync(int fileId, int profileId);
         Task<TranscodingJob?> GetByIdAsync(int id);
+        Task UpdateStatusAsync(int jobId, string newStatus);
     }
 
 }

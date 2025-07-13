@@ -13,8 +13,6 @@ namespace VideoTranscoder.VideoTranscoder.Domain.Entities
         public long Size { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
-
-
-        public List<Thumbnail> Thumbnails { get; set; }
+        public string defaultThumbnailUrl { get; set; }
     }
 }
