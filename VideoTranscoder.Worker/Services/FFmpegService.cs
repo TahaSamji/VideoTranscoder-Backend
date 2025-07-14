@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using VideoTranscoder.VideoTranscoder.Application.enums;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
 using VideoTranscoder.VideoTranscoder.Domain.Entities;
 
@@ -9,16 +10,18 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
     {
         private readonly ILogger<FFmpegService> _logger;
         private readonly ICloudStorageService _cloudStorageService;
-         private readonly IEncryptionService _encyptionService;
+        private readonly IEncryptionService _encyptionService;
+        private readonly FileLockService _fileLockService;
 
 
-        public FFmpegService(ILogger<FFmpegService> logger,IEncryptionService encyptionService, ICloudStorageService cloudStorageService)
+
+        public FFmpegService(ILogger<FFmpegService> logger, IEncryptionService encyptionService, ICloudStorageService cloudStorageService, FileLockService fileLockService)
         {
             _logger = logger;
             _cloudStorageService = cloudStorageService;
             _encyptionService = encyptionService;
+            _fileLockService = fileLockService;
         }
-
         public async Task<string> TranscodeToCMAFAsync(string filename, int userId, int fileId, EncodingProfile encodingProfile)
         {
             // Ensure output directory exists
@@ -33,8 +36,8 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             Directory.CreateDirectory(hlsDir);
             Directory.CreateDirectory(dashDir);
 
-            // string inputPath = await _cloudStorageService.DownloadVideoToLocalAsync(filename, userId, fileId);
-            string inputPath = Path.Combine(currentDir, "input", $"{userId}", $"{fileId}", "videos", filename);
+            // Use the download service which handles locking internally
+            string inputPath = await _cloudStorageService.DownloadVideoToLocalAsync(filename, userId, fileId);
 
             // Build FFmpeg command based on profile type
             string ffmpegArgs;
@@ -55,11 +58,19 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
 
             Console.WriteLine("🎬 FFmpeg Args: " + ffmpegArgs);
 
-            await RunFFmpegAsync(ffmpegArgs);
-            return await _cloudStorageService.UploadTranscodedOutputAsync(outputDir, filename, fileId, userId, encodingProfile.Id);
+            try
+            {
+                await RunFFmpegAsync(ffmpegArgs);
+                return await _cloudStorageService.UploadTranscodedOutputAsync(outputDir, filename, fileId, userId, encodingProfile.Id);
+            }
+            finally
+            {
+                // Decrement usage tracker when done
+                FileUsageTracker.Decrement(inputPath);
+            }
         }
 
-        // public async Task<string> TranscodeToCMAFWithCENCAsync(string filename, int userId, int fileId, EncodingProfile encodingProfile)
+        // public async Task<string> TranscodeToCMAFAsync(string filename, int userId, int fileId, EncodingProfile encodingProfile)
         // {
         //     // Ensure output directory exists
         //     string currentDir = Directory.GetCurrentDirectory();
@@ -74,39 +85,52 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
         //     Directory.CreateDirectory(dashDir);
 
         //     // string inputPath = await _cloudStorageService.DownloadVideoToLocalAsync(filename, userId, fileId);
-        //     // string inputPath = Path.Combine(currentDir, "input", $"{userId}", $"{fileId}", "videos", filename);
-        //     string inputPath = Path.Combine(currentDir, "input", "1", "1", "videos", "newvid.mp4");
+        //     string inputPath = Path.Combine(currentDir, "input", $"{userId}", $"{fileId}", "videos", filename);
+        //     var status = _fileLockService.GetStatus(inputPath);
+        //     if (status != FileStatus.Ready)
+        //     {
+        //         Console.WriteLine($"⏳ File '{inputPath}' status is '{status}', waiting...");
+        //         var resultStatus = await _fileLockService.WaitUntilReadyAsync(inputPath);
+
+        //         if (resultStatus != FileStatus.Ready)
+        //         {
+        //             Console.WriteLine("🚫 File did not reach ready state after waiting.");
+        //             throw new InvalidOperationException("File not ready for transcoding.");
+        //         }
+        //     }
+
+        //     // ✅ Proceed only if file exists and is marked ready
+        //     if (!File.Exists(inputPath))
+        //     {
+        //         Console.WriteLine($"❌ File does not exist at expected path: {inputPath}");
+        //         throw new FileNotFoundException("Input file not found.", inputPath);
+        //     }
 
         //     // Build FFmpeg command based on profile type
-        //     // string ffmpegArgs;
-        //     // if (encodingProfile.FormatType?.ToLower() == "dash")
-        //     // {
-        //     //     ffmpegArgs = $"-y -i \"{inputPath}\" {encodingProfile.FfmpegArgs} \"{dashDir}/manifest.mpd\"";
-        //     // }
-        //     // else if (encodingProfile.FormatType?.ToLower() == "hls")
-        //     // {
-        //     //     ffmpegArgs = $"-y -i \"{inputPath}\" {encodingProfile.FfmpegArgs} " +
-        //     //                  $"-hls_segment_filename \"{hlsDir}/segment_%03d.m4s\" " +
-        //     //                  $"\"{hlsDir}/playlist.m3u8\"";
-        //     // }
-        //     // else
-        //     // {
-        //     //     throw new InvalidOperationException($"Unsupported encoding profile type: {encodingProfile.FormatType}");
-        //     // }
-        //     // string ffmpegArgs = $"-y -i \"{inputPath}\" " +
-        //     //         "-c:v libx264 -b:v 3000k -s 854x480 -r 30 -preset medium -crf 23 -g 60 -keyint_min 60 -sc_threshold 0 " +
-        //     //         "-c:a aac -b:a 128k " +
-        //     //         "-movflags +faststart " +
-        //     //         $"\"{dashDir}/output_encoded.mp4\"";
+        //     string ffmpegArgs;
+        //     if (encodingProfile.FormatType?.ToLower() == "dash")
+        //     {
+        //         ffmpegArgs = $"-y -i \"{inputPath}\" {encodingProfile.FfmpegArgs} \"{dashDir}/manifest.mpd\"";
+        //     }
+        //     else if (encodingProfile.FormatType?.ToLower() == "hls")
+        //     {
+        //         ffmpegArgs = $"-y -i \"{inputPath}\" {encodingProfile.FfmpegArgs} " +
+        //                      $"-hls_segment_filename \"{hlsDir}/segment_%03d.m4s\" " +
+        //                      $"\"{hlsDir}/playlist.m3u8\"";
+        //     }
+        //     else
+        //     {
+        //         throw new InvalidOperationException($"Unsupported encoding profile type: {encodingProfile.FormatType}");
+        //     }
 
-        //     // Console.WriteLine("🎬 FFmpeg Args: " + ffmpegArgs);
+        //     Console.WriteLine("🎬 FFmpeg Args: " + ffmpegArgs);
 
-        //     // await RunFFmpegAsync(ffmpegArgs);
-        //     await _encyptionService.EncryptToHLSWithCENCAsync(dashDir,userId,fileId,encodingProfile);
-        //     _logger.LogInformation("Dome witn encytption"); 
-        //     // return await _cloudStorageService.UploadTranscodedOutputAsync(outputDir, filename, fileId, userId, encodingProfile.Id);
-        //     return "done";
+        //     await RunFFmpegAsync(ffmpegArgs);
+        //     // FileUsageTracker.Decrement(inputPath);
+        //     _fileLockService.MarkReady(inputPath);
+        //     return await _cloudStorageService.UploadTranscodedOutputAsync(outputDir, filename, fileId, userId, encodingProfile.Id);
         // }
+
 
 
         private async Task RunFFmpegAsync(string args)
@@ -147,6 +171,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                 // string currentDir = Directory.GetCurrentDirectory();
                 // var outputDir = Path.Combine(currentDir, "temp", $"{userId}", $"{fileId}", "thumbnails");
                 // Directory.CreateDirectory(outputDir);
+
                 string inputPath = await _cloudStorageService.DownloadVideoToLocalAsync(fileName, userId, fileId);
                 // here
                 // FFmpeg command to generate thumbnail at specific time
@@ -160,24 +185,26 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                     RedirectStandardError = true,
                     CreateNoWindow = true
                 };
-                Console.WriteLine("FFmpeg transcoding Started.");
+                Console.WriteLine("FFmpeg Thumbnail Generation Started.");
                 using (var process = new Process { StartInfo = processStartInfo })
                 {
                     process.Start();
 
-                    // Copy FFmpeg output (PNG image) to memory stream
+                    // Copy FFmpeg output to memory stream
                     await process.StandardOutput.BaseStream.CopyToAsync(thumbnailStream);
 
                     // Wait for process to complete
                     await process.WaitForExitAsync();
-                    Console.WriteLine("FFmpeg Thumbnail Generation completed successfully.");
+
                     if (process.ExitCode != 0)
                     {
                         var error = await process.StandardError.ReadToEndAsync();
                         throw new InvalidOperationException($"FFmpeg failed with exit code {process.ExitCode}: {error}");
                     }
-                }
 
+                }
+                Console.WriteLine("FFmpeg Thumbnail Generation completed successfully.");
+            
                 // Reset stream position for reading
                 thumbnailStream.Position = 0;
 
@@ -207,7 +234,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
 
                 // 2. Generate thumbnails with proper output pattern
                 string outputPattern = Path.Combine(thumbnailDir, "thumb_%03d.jpg");
-                string ffmpegArgs = $"-i \"{inputPath}\" -vf fps=1/10,scale=320:180 -frames:v 5 \"{outputPattern}\"";
+                string ffmpegArgs = $"-i \"{inputPath}\" -vf fps=1/5,scale=320:180 -frames:v 5 \"{outputPattern}\"";
 
                 var psi = new ProcessStartInfo
                 {

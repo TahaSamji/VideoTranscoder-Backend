@@ -43,15 +43,15 @@ builder.Services.AddSingleton(provider =>
     );
 });
 
-// builder.Services.AddDbContext<AppDbContext>(options =>
-//     options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
-// );
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseMySql(
-        configuration.GetConnectionString("DefaultConnection"),
-        ServerVersion.AutoDetect(configuration.GetConnectionString("DefaultConnection"))
-    )
+    options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
 );
+// builder.Services.AddDbContext<AppDbContext>(options =>
+//     options.UseMySql(
+//         configuration.GetConnectionString("DefaultConnection"),
+//         ServerVersion.AutoDetect(configuration.GetConnectionString("DefaultConnection"))
+//     )
+// );
 
 #endregion
 
@@ -129,6 +129,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IThumbnailService, ThumbnailService>();
 builder.Services.AddScoped<IEncryptionService, CencEncryptionService>();
 builder.Services.AddScoped<ICDNService, AzureCDNService>();
+builder.Services.AddSingleton<FileLockService>();
 
 
 
@@ -150,7 +151,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-// 🔹 MVC Controllers
+
 builder.Services.AddControllers();
 
 #endregion

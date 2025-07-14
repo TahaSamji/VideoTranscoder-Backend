@@ -5,9 +5,9 @@
 using Microsoft.Extensions.Options;
 using VideoTranscoder.VideoTranscoder.Application.Configurations;
 using VideoTranscoder.VideoTranscoder.Application.DTOs;
+using VideoTranscoder.VideoTranscoder.Application.enums;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
 using VideoTranscoder.VideoTranscoder.Domain.Entities;
-using VideoTranscoder.VideoTranscoder.Domain.Enums;
 using VideoTranscoder.VideoTranscoder.Worker.Services;
 
 namespace VideoTranscoder.VideoTranscoder.Application.Services
@@ -23,10 +23,11 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
         private readonly IVideoVariantRepository _videoVariantRepository;
         private readonly AzureOptions _azureOptions;
         private readonly IEncodingProfileRepository _encodingProfileRepository;
+        private readonly ILogger<VideoService> _logger;
 
 
 
-        public VideoService(ICloudStorageService azureService, IVideoVariantRepository videoVariantRepository, IEncodingProfileRepository encodingProfileRepository, IVideoRepository videoRepository, IMessageQueueService queuePublisher, FFmpegService fFmpegService, IThumbnailRepository thumbnailRepository, IOptions<AzureOptions> azureOptions,
+        public VideoService(ICloudStorageService azureService, ILogger<VideoService> logger, IVideoVariantRepository videoVariantRepository, IEncodingProfileRepository encodingProfileRepository, IVideoRepository videoRepository, IMessageQueueService queuePublisher, FFmpegService fFmpegService, IThumbnailRepository thumbnailRepository, IOptions<AzureOptions> azureOptions,
         IConfiguration configuration)
         {
             _cloudStorageService = azureService;
@@ -38,6 +39,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
             _azureOptions = azureOptions.Value;
             _encodingProfileRepository = encodingProfileRepository;
             _videoVariantRepository = videoVariantRepository;
+            _logger = logger;
 
         }
 
@@ -48,28 +50,51 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
 
         public async Task<List<VideoRenditionDto>> GetVideoRenditionsByFileIdAsync(int fileId)
         {
-            var variants = await _videoVariantRepository.GetVariantsByFileIdIfCompletedAsync(fileId);
+            try
+            {
+                _logger.LogInformation("🔍 Fetching video renditions for fileId: {FileId}", fileId);
 
-            return [.. variants.Select(v => new VideoRenditionDto
-    {
-        VariantId = v.Id,
-        Type = v.Type,
-        Resolution = v.Resolution,
-        BitrateKbps = v.BitrateKbps,
-        Size = v.Size,
-        DurationSeconds = v.DurationSeconds,
-        VideoUrl = v.VideoURL,
-        CreatedAt = v.CreatedAt
-    })];
+                var variants = await _videoVariantRepository.GetVariantsByFileIdIfCompletedAsync(fileId);
+
+                if (variants == null || !variants.Any())
+                {
+                    _logger.LogWarning("⚠️ No completed variants found for fileId: {FileId}", fileId);
+                    return new List<VideoRenditionDto>();
+                }
+
+                var renditionDtos = variants.Select(v => new VideoRenditionDto
+                {
+                    VariantId = v.Id,
+                    Type = v.Type,
+                    Resolution = v.Resolution,
+                    BitrateKbps = v.BitrateKbps,
+                    Size = v.Size,
+                    DurationSeconds = v.DurationSeconds,
+                    VideoUrl = v.VideoURL,
+                    CreatedAt = v.CreatedAt
+                }).ToList();
+
+                _logger.LogInformation("✅ Found {Count} renditions for fileId: {FileId}", renditionDtos.Count, fileId);
+
+                return renditionDtos;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error while fetching video renditions for fileId: {FileId}", fileId);
+                throw;
+            }
         }
 
 
-        public async Task<string> StoreFileAndReturnThumbnailUrlAsync(int totalChunks, string outputFileName, int userId, long fileSize, int EncodingId)
+        public async Task<string> StoreFileAndReturnThumbnailUrlAsync(int totalChunks, string outputFileName, int userId, long fileSize, int encodingId)
         {
             try
             {
-                // Step 1: Check for existing video
+                _logger.LogInformation("📥 Processing file upload for user {UserId}, file '{FileName}', size {FileSize}", userId, outputFileName, fileSize);
+
+                string thumbnailUrl;
                 var videoMetaData = await _videoRepository.FindByNameAndSizeAsync(outputFileName, fileSize, userId);
+
                 if (videoMetaData == null)
                 {
                     string containerName = _azureOptions.ContainerName;
@@ -80,87 +105,99 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                         UserId = userId,
                         OriginalFilename = outputFileName,
                         BlobPath = blobPath,
-                        Status = "Merged",
+                        Status = VideoProcessStatus.Merged.ToString(),
                         Size = fileSize,
                         CreatedAt = DateTime.UtcNow,
-                        defaultThumbnailUrl = "",
                         UpdatedAt = DateTime.UtcNow,
-                        
+                        defaultThumbnailUrl = string.Empty
                     };
 
                     await _videoRepository.SaveAsync(videoMetaData);
-                }
+                    _logger.LogInformation("📄 Saved new VideoMetaData for fileId {FileId}", videoMetaData.Id);
 
+                    _logger.LogInformation("🖼️ Generating thumbnail for video ID {FileId}", videoMetaData.Id);
+                    thumbnailUrl = await GenerateDefaultThumbnailAsync(outputFileName, userId, videoMetaData.Id);
+
+                    await _videoRepository.UpdateThumbnailUrlAsync(videoMetaData.Id, thumbnailUrl);
+                    await _videoRepository.UpdateStatusAsync(videoMetaData.Id, VideoProcessStatus.Queued.ToString());
+                }
+                else
+                {
+                    _logger.LogInformation("ℹ️ Existing metadata found for file '{FileName}'", outputFileName);
+                    _logger.LogInformation("ℹ️ Skipping thumbnail generation for file '{FileName}'", outputFileName);
+                    thumbnailUrl = videoMetaData.defaultThumbnailUrl;
+                }
+                string currentDir = Directory.GetCurrentDirectory();
+                string inputDir = Path.Combine(currentDir, "input", $"{userId}", $"{videoMetaData.Id}", "videos");
+                string localFilePath = Path.Combine(inputDir, outputFileName);
+                FileUsageTracker.Increment(localFilePath);
 
                 var message = new TranscodeRequestMessage
                 {
                     FileId = videoMetaData.Id,
                     BlobPath = videoMetaData.BlobPath,
-                    EncodingProfileId = EncodingId
+                    EncodingProfileId = encodingId
                 };
-                // EncodingProfile encodingProfile = await _encodingProfileRepository.GetByIdAsync(EncodingId);
 
-                string thumbnailUrl = await GenerateDefaultThumbnailAsync(outputFileName, userId, videoMetaData.Id);
                 string queueName = _configuration["AzureServiceBus:TranscodeQueueName"]!;
-                await _queuePublisher.SendMessageAsync(message, queueName);
+                _logger.LogInformation("📤 Sending transcode request to queue '{Queue}' for fileId {FileId}", queueName, videoMetaData.Id);
 
-                await _videoRepository.UpdateThumbnailUrlAsync(videoMetaData.Id,thumbnailUrl);
-                 await _videoRepository.UpdateStatusAsync(videoMetaData.Id,VideoProcessStatus.Queued.ToString());
-                // await _ffmpegService.GenerateMultipleThumbnailsAsync(videoMetaData.OriginalFilename,userId,videoMetaData.Id);
-                // await _ffmpegService.TranscodeToCMAFWithCENCAsync(videoMetaData.OriginalFilename, userId,videoMetaData.Id,encodingProfile);
+                await _queuePublisher.SendMessageAsync(message, queueName);
+                _logger.LogInformation("✅ Video file {FileId} processing queued successfully  : {Encoding Id}", videoMetaData.Id, encodingId);
+
                 return thumbnailUrl;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("❌ Error in StoreFileAndReturnThumbnailUrlAsync: " + ex.Message);
+                _logger.LogError(ex, "❌ Error in StoreFileAndReturnThumbnailUrlAsync for user {UserId} and file '{FileName}'", userId, outputFileName);
                 throw;
             }
         }
+
 
 
         private async Task<string> GenerateDefaultThumbnailAsync(string outputFileName, int userId, int videoId)
         {
             try
             {
-                // string SASUrl = await _cloudStorageService.GenerateSasUriAsync(outputFileName);
-                // Console.WriteLine(SASUrl);
-                // var thumbnailStream = await _ffmpegService.GenerateThumbnailAsync(SASUrl, "00:00:05");
+                _logger.LogInformation("🎬 Starting default thumbnail generation for videoId: {VideoId}, userId: {UserId}, fileName: {FileName}", videoId, userId, outputFileName);
+
                 var thumbnailStream = await _ffmpegService.GenerateThumbnailFromDirAsync("00:00:05", outputFileName, userId, videoId);
 
-                // 3. Create thumbnail filename
                 var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(outputFileName);
-                var extention = Path.GetExtension(outputFileName);
+                var extension = Path.GetExtension(outputFileName);
                 var thumbnailFileName = $"{fileNameWithoutExtension}_thumb_{userId}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.jpg";
 
-                // 4. Upload thumbnail to blob storage
+                _logger.LogDebug("📝 Thumbnail file name generated: {ThumbnailFileName}", thumbnailFileName);
+
                 var thumbnailBlobPath = await _cloudStorageService.UploadThumbnailAsync(thumbnailStream, thumbnailFileName, videoId, outputFileName);
 
-                // 5. Generate SAS URI for thumbnail access (optional - depends on your needs)
                 var thumbnailUrl = _cloudStorageService.GenerateThumbnailSasUri(thumbnailBlobPath);
-                Console.WriteLine(thumbnailUrl);
 
-                Console.WriteLine($"✅ Successfully generated and stored thumbnail: {thumbnailBlobPath}");
-                var Thumbnail = new Thumbnail
+                _logger.LogInformation("✅ Thumbnail uploaded to blob storage at path: {BlobPath}", thumbnailBlobPath);
+                _logger.LogInformation("🌐 Thumbnail accessible at: {ThumbnailUrl}", thumbnailUrl);
+
+                var thumbnail = new Thumbnail
                 {
                     FileId = videoId,
                     IsDefault = true,
                     BlobUrl = thumbnailUrl,
                     TimeOffset = "00:00:05",
                     CreatedAt = DateTime.UtcNow
-
                 };
 
-                await _thumbnailRepository.SaveAsync(Thumbnail);
+                await _thumbnailRepository.SaveAsync(thumbnail);
+
+                _logger.LogInformation("🗄️ Thumbnail metadata saved to DB for videoId: {VideoId}", videoId);
 
                 return thumbnailUrl;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("❌ Error in GenerateAndStoreThumbnailAsync: " + ex.Message);
+                _logger.LogError(ex, "❌ Error generating or saving default thumbnail for videoId: {VideoId}", videoId);
                 throw;
             }
         }
-
 
 
 

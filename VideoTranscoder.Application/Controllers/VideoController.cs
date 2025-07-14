@@ -67,11 +67,11 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
             return Ok(thumbnails);
         }
 
-         [HttpPost("set-default-thumbnail")]
+        [HttpPost("set-default-thumbnail")]
         public async Task<IActionResult> SetDefaultThumbnail(
 
-        [FromQuery] int thumbnailId,
-        [FromQuery] int fileId)
+       [FromQuery] int thumbnailId,
+       [FromQuery] int fileId)
         {
             try
             {
@@ -83,6 +83,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
+        
 
     }
 

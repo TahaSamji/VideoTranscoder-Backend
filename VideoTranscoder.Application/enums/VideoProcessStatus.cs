@@ -1,4 +1,4 @@
-namespace VideoTranscoder.VideoTranscoder.Domain.Enums
+namespace VideoTranscoder.VideoTranscoder.Application.enums
 {
     public enum VideoProcessStatus
     {

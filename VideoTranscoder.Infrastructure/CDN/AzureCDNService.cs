@@ -32,18 +32,18 @@ public class AzureCDNService : ICDNService
     //     return cdnSignedUrl;
     // }
     public async Task<string> GenerateSignedUrlAsync(string storagePath)
-{
-    // Step 1: Generate a container-level SAS token (not for a single file)
-    var containerSasUrl = await _cloudStorageService.GenerateContainerSasUriAsync(); // You need to return this with token only
-    var uri = new Uri(containerSasUrl);
- Console.WriteLine(uri);
-    // Step 2: Extract only the query (SAS token)
-    var sasToken = uri.Query.TrimStart('?');  // "sv=...&se=...&sp=...&sig=..."
+    {
+        // Step 1: Generate a container-level SAS token (not for a single file)
+        var containerSasUrl = await _cloudStorageService.GenerateContainerSasUriAsync(); // You need to return this with token only
+        var uri = new Uri(containerSasUrl);
+        Console.WriteLine(uri);
+        // Step 2: Extract only the query (SAS token)
+        var sasToken = uri.Query.TrimStart('?');  // "sv=...&se=...&sp=...&sig=..."
         Console.WriteLine(sasToken);
-    // Step 3: Combine the storagePath (e.g. uploads/1/abc/dash/manifest.mpd) with CDN base URL
-    var cdnSignedUrl = $"{_cdnBaseUrl}/{storagePath}?{sasToken}";
-    return cdnSignedUrl;
-}
+        // Step 3: Combine the storagePath (e.g. uploads/1/abc/dash/manifest.mpd) with CDN base URL
+        var cdnSignedUrl = $"{_cdnBaseUrl}/{storagePath}?{sasToken}";
+        return cdnSignedUrl;
+    }
 
 
 }

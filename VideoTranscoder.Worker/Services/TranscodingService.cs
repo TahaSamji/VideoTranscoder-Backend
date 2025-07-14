@@ -93,7 +93,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                 try
                 {
                     string videoBlobpath = await _ffmpegService.TranscodeToCMAFAsync(videoFile.OriginalFilename, videoFile.UserId, videoFile.Id, encodingProfile);
-
+                    
                     await _transcodingJobRepository.UpdateStatusAsync(Job.Id, "Completed");
                     string outputfile = "";
                     if (encodingProfile.FormatType == "hls")
@@ -128,9 +128,9 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                         await _thumbnailService.GenerateAndStoreThumbnailsAsync(videoFile.OriginalFilename, videoFile.UserId, videoFile.Id);
                         _logger.LogInformation("Thumbnails Saved .");
                     }
-
-                    await _cleanerService.CleanDirectoryContentsAsync("temp");
-                    await _cleanerService.CleanDirectoryContentsAsync("input");
+                        
+                    // await _cleanerService.CleanDirectoryContentsAsync("temp");
+                    // await _cleanerService.CleanDirectoryContentsAsync("input");
 
                 }
                 catch (Exception ex)

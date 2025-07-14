@@ -72,7 +72,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                 }
                 else
                 {
-                    _logger.LogError("Transcoding failed for FileId: {FileId} - {Error}", request.FileId," result.ErrorMessage");
+                    _logger.LogError("Transcoding failed for FileId: {FileId} - {Error}", request.FileId, request.EncodingProfileId);
                     
                     // Retry logic - check delivery count
                     if (args.Message.DeliveryCount >= 3)
