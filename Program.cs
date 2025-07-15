@@ -14,7 +14,6 @@ using VideoTranscoder.VideoTranscoder.Infrastructure.Queues;
 using VideoTranscoder.VideoTranscoder.Infrastructure.Storage;
 using VideoTranscoder.VideoTranscoder.Infrastructure.Persistance;
 using VideoTranscoder.VideoTranscoder.Domain.DatabaseContext;
-using Microsoft.Extensions.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
@@ -43,15 +42,15 @@ builder.Services.AddSingleton(provider =>
     );
 });
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
-);
 // builder.Services.AddDbContext<AppDbContext>(options =>
-//     options.UseMySql(
-//         configuration.GetConnectionString("DefaultConnection"),
-//         ServerVersion.AutoDetect(configuration.GetConnectionString("DefaultConnection"))
-//     )
+//     options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
 // );
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseMySql(
+        configuration.GetConnectionString("DefaultConnection"),
+        ServerVersion.AutoDetect(configuration.GetConnectionString("DefaultConnection"))
+    )
+);
 
 #endregion
 
@@ -129,7 +128,6 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IThumbnailService, ThumbnailService>();
 builder.Services.AddScoped<IEncryptionService, CencEncryptionService>();
 builder.Services.AddScoped<ICDNService, AzureCDNService>();
-builder.Services.AddSingleton<FileLockService>();
 
 
 

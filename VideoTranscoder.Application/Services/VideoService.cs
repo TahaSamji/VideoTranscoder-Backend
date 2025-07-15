@@ -23,12 +23,12 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
         private readonly IThumbnailRepository _thumbnailRepository;
         private readonly IVideoVariantRepository _videoVariantRepository;
         private readonly AzureOptions _azureOptions;
-  
+
         private readonly ILogger<VideoService> _logger;
 
 
 
-        public VideoService(ICloudStorageService azureService,IThumbnailService thumbnailService, ILogger<VideoService> logger, IVideoVariantRepository videoVariantRepository, IVideoRepository videoRepository, IMessageQueueService queuePublisher, FFmpegService fFmpegService, IThumbnailRepository thumbnailRepository, IOptions<AzureOptions> azureOptions,
+        public VideoService(ICloudStorageService azureService, IThumbnailService thumbnailService, ILogger<VideoService> logger, IVideoVariantRepository videoVariantRepository, IVideoRepository videoRepository, IMessageQueueService queuePublisher, FFmpegService fFmpegService, IThumbnailRepository thumbnailRepository, IOptions<AzureOptions> azureOptions,
         IConfiguration configuration)
         {
             _cloudStorageService = azureService;
@@ -85,79 +85,84 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 throw;
             }
         }
-
-
-        public async Task<string> StoreFileAndReturnThumbnailUrlAsync(int totalChunks, string outputFileName, int userId, long fileSize, int encodingId)
+        public async Task StoreFileAndGenerateThumbnailsAsync(int totalChunks, string outputFileName, int userId, long fileSize, int encodingId)
         {
             try
             {
                 _logger.LogInformation("📥 Processing file upload for user {UserId}, file '{FileName}', size {FileSize}", userId, outputFileName, fileSize);
 
-                string thumbnailUrl;
-                var videoMetaData = await _videoRepository.FindByNameAndSizeAsync(outputFileName, fileSize, userId);
-
-                if (videoMetaData == null)
+                // Check if video already exists
+                var existingVideo = await _videoRepository.FindByNameAndSizeAsync(outputFileName, fileSize, userId);
+                if (existingVideo != null)
                 {
-                    string containerName = _azureOptions.ContainerName;
-                    var blobPath = $"{containerName}/{userId}/{outputFileName}";
-
-                    videoMetaData = new VideoMetaData
-                    {
-                        UserId = userId,
-                        OriginalFilename = outputFileName,
-                        BlobPath = blobPath,
-                        Status = VideoProcessStatus.Merged.ToString(),
-                        Size = fileSize,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow,
-                        defaultThumbnailUrl = string.Empty
-                    };
-
-                    await _videoRepository.SaveAsync(videoMetaData);
-                    _logger.LogInformation("📄 Saved new VideoMetaData for fileId {FileId}", videoMetaData.Id);
-
-                    _logger.LogInformation("🖼️ Generating thumbnail for video ID {FileId}", videoMetaData.Id);
-                    thumbnailUrl = await _thumbnailService.GenerateDefaultThumbnailAsync(outputFileName, userId, videoMetaData.Id);
-
-                    await _videoRepository.UpdateThumbnailUrlAsync(videoMetaData.Id, thumbnailUrl);
-                    await _videoRepository.UpdateStatusAsync(videoMetaData.Id, VideoProcessStatus.Queued.ToString());
+                    _logger.LogWarning("⚠️ Video already exists for user {UserId}, file '{FileName}', size {FileSize}", userId, outputFileName, fileSize);
+                    throw new InvalidOperationException("Video already exists.");
                 }
-                else
+
+                // Prepare blob path
+                string containerName = _azureOptions.ContainerName;
+                var blobPath = $"{containerName}/{userId}/{outputFileName}";
+
+                // Create new video metadata entry
+                var videoMetaData = new VideoMetaData
                 {
-                    _logger.LogInformation("ℹ️ Existing metadata found for file '{FileName}'", outputFileName);
-                    _logger.LogInformation("ℹ️ Skipping thumbnail generation for file '{FileName}'", outputFileName);
-                    thumbnailUrl = videoMetaData.defaultThumbnailUrl;
-                }
-                string currentDir = Directory.GetCurrentDirectory();
-                string inputDir = Path.Combine(currentDir, "input", $"{userId}", $"{videoMetaData.Id}", "videos");
-                string localFilePath = Path.Combine(inputDir, outputFileName);
-                // FileUsageTracker.Increment(localFilePath);
+                    UserId = userId,
+                    OriginalFilename = outputFileName,
+                    BlobPath = blobPath,
+                    Status = VideoProcessStatus.Merged.ToString(),
+                    Size = fileSize,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                    defaultThumbnailUrl = string.Empty
+                };
 
+                await _videoRepository.SaveAsync(videoMetaData);
+                _logger.LogInformation("📄 Saved new VideoMetaData with ID {FileId}", videoMetaData.Id);
+
+                // Download video locally to generate thumbnails
+                _logger.LogInformation("⬇️ Downloading video locally , FileId {FileId}", videoMetaData.Id);
+                string inputFilePath = await _cloudStorageService.DownloadVideoToLocalAsync(outputFileName, userId, videoMetaData.Id);
+                // Send transcode request
                 var message = new TranscodeRequestMessage
                 {
                     FileId = videoMetaData.Id,
                     BlobPath = videoMetaData.BlobPath,
-                    EncodingProfileId = encodingId
+                    EncodingProfileId = encodingId,
+                    LocalVideoPath = inputFilePath
+                
                 };
 
                 string queueName = _configuration["AzureServiceBus:TranscodeQueueName"]!;
-                _logger.LogInformation("📤 Sending transcode request to queue '{Queue}' for fileId {FileId}", queueName, videoMetaData.Id);
+                _logger.LogInformation("📤 Sending transcode request to queue '{Queue}' for FileId {FileId}", queueName, videoMetaData.Id);
 
                 await _queuePublisher.SendMessageAsync(message, queueName);
-                _logger.LogInformation("✅ Video file {FileId} processing queued successfully  : {Encoding Id}", videoMetaData.Id, encodingId);
+                _logger.LogInformation("✅ Transcode request sent successfully for FileId {FileId}, EncodingId {EncodingId}", videoMetaData.Id, encodingId);
+                // Generate and store thumbnails
+                _logger.LogInformation("🖼️ Generating thumbnails for FileId {FileId}", videoMetaData.Id);
+                var thumbnailUrl = await _thumbnailService.GenerateAndStoreThumbnailsAsync(outputFileName, userId, videoMetaData.Id, inputFilePath);
 
-                return thumbnailUrl;
+                // Update thumbnail URL and status
+                await _videoRepository.UpdateThumbnailUrlAsync(videoMetaData.Id, thumbnailUrl);
+                await _videoRepository.UpdateStatusAsync(videoMetaData.Id, VideoProcessStatus.Queued.ToString());
+
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "⚠️ Duplicate upload attempt for user {UserId}, file '{FileName}'", userId, outputFileName);
+                throw; // Rethrow to let the caller handle it
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ Error in StoreFileAndReturnThumbnailUrlAsync for user {UserId} and file '{FileName}'", userId, outputFileName);
+                _logger.LogError(ex, "❌ Error in StoreFileAndReturnThumbnailUrlAsync for user {UserId}, file '{FileName}'", userId, outputFileName);
                 throw;
             }
         }
 
 
 
-       
+
+
+
 
 
 

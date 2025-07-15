@@ -29,9 +29,8 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
         public async Task<IActionResult> MergeCompleteAndRequestThumbnailUrl([FromBody] MergeRequestDto request)
         {
             int userId = _authService.GetCurrentUserId(User);
-            // Console.WriteLine(userId);
 
-            var thumbnailUrl = await _videoService.StoreFileAndReturnThumbnailUrlAsync(
+            await _videoService.StoreFileAndGenerateThumbnailsAsync(
                 request.TotalChunks,
                 request.OutputFileName,
                 userId,
@@ -39,7 +38,10 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
                 request.EncodingId
             );
 
-            return Ok(new { thumbnailUrl });
+            return Ok(new
+            {
+                message = "🎬 Video successfully uploaded and sent for processing."
+            });
         }
         [HttpGet("my-uploads")]
         public async Task<IActionResult> GetMyUploads([FromQuery] int page = 1, [FromQuery] int pageSize = 6)
@@ -83,7 +85,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
-        
+
 
     }
 

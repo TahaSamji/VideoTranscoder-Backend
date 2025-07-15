@@ -8,7 +8,9 @@ namespace VideoTranscoder.VideoTranscoder.Domain.Entities
     {
         [Key]
         public int Id { get; set; }
-         public int TranscodingJobId { get; set; }
+        public int TranscodingJobId { get; set; }
+
+        public int VideoFileId { get; set; }
 
 
         [ForeignKey("TranscodingJobId")]

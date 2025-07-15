@@ -4,6 +4,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.DTOs
     {
         public required int FileId { get; set; }
         public required string BlobPath { get; set; }
+        public required string LocalVideoPath { get; set; }
         public required int EncodingProfileId { get; set; }
     }
 }

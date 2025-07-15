@@ -92,7 +92,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
 
                 try
                 {
-                    string videoBlobpath = await _ffmpegService.TranscodeToCMAFAsync(videoFile.OriginalFilename, videoFile.UserId, videoFile.Id, encodingProfile);
+                    string videoBlobpath = await _ffmpegService.TranscodeToCMAFAsync(request.LocalVideoPath,videoFile.OriginalFilename, videoFile.UserId, videoFile.Id, encodingProfile);
 
                     await _transcodingJobRepository.UpdateStatusAsync(Job.Id, "Completed");
                     string outputfile = "";
@@ -108,7 +108,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                     string videoUrl = await _CDNService.GenerateSignedUrlAsync(storagePath);
                     var variant = new VideoVariant
                     {
-
+                          VideoFileId = videoFile.Id,
                         TranscodingJobId = Job.Id,
                         Type = encodingProfile.FormatType,
                         BlobPath = videoBlobpath,
@@ -122,13 +122,13 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
 
                     await _videoVariantRepository.SaveAsync(variant);
                     _logger.LogInformation("🎞️ Video variant saved.");
-                    int thumbnailCount = await _thumbnailService.CountThumbnailsForFileAsync(videoFile.Id);
-                    if (thumbnailCount < 2)
-                    {
-                        await _thumbnailService.GenerateAndStoreThumbnailsAsync(videoFile.OriginalFilename, videoFile.UserId, videoFile.Id);
-                        _logger.LogInformation("Thumbnails Saved .");
+                    // int thumbnailCount = await _thumbnailService.CountThumbnailsForFileAsync(videoFile.Id);
+                    // if (thumbnailCount < 2)
+                    // {
+                    //     await _thumbnailService.GenerateAndStoreThumbnailsAsync(videoFile.OriginalFilename, videoFile.UserId, videoFile.Id);
+                    //     _logger.LogInformation("Thumbnails Saved .");
 
-                    }
+                    // }
 
 
 

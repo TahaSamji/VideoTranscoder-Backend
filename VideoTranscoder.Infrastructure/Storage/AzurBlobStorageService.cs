@@ -17,18 +17,16 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
         private readonly BlobServiceClient _blobServiceClient;
         private readonly IUserService _userService;
         private readonly ILogger<AzureBlobStorageService> _logger;
-        private readonly FileLockService _fileLockService;
         private readonly LocalCleanerService _cleanerService;
 
 
 
-        public AzureBlobStorageService(FileLockService fileLockService, LocalCleanerService clearService, ILogger<AzureBlobStorageService> logger, IOptions<AzureOptions> azureOptions, BlobServiceClient blobServiceClient, IUserService userService)
+        public AzureBlobStorageService( LocalCleanerService clearService, ILogger<AzureBlobStorageService> logger, IOptions<AzureOptions> azureOptions, BlobServiceClient blobServiceClient, IUserService userService)
         {
             _azureOptions = azureOptions.Value;
             _blobServiceClient = blobServiceClient;
             _userService = userService;
             _logger = logger;
-            _fileLockService = fileLockService;
             _cleanerService = clearService;
         }
 
@@ -258,11 +256,11 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
                         }
                     }
                 }
-            //  await _cleanerService.CleanDirectoryContentsAsync(tempOutputDir);
+                //  await _cleanerService.CleanDirectoryContentsAsync(tempOutputDir);
 
                 if (firstUploadedBlobPath == null)
                     throw new Exception("❌ Upload failed: No files were uploaded to blob storage.");
- 
+
                 return firstUploadedBlobPath;
             }
             catch (Exception ex)
@@ -325,82 +323,32 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
 
             try
             {
-                // Check if file already exists and is ready
-                if (File.Exists(localFilePath) && _fileLockService.GetStatus(localFilePath) == FileStatus.Ready)
-                {
-                    _logger.LogInformation("📁 File already exists and is ready: {Path}", localFilePath);
-                    // FileUsageTracker.Increment(localFilePath);
-                    return localFilePath;
-                }
+                _logger.LogInformation("⬇️ Starting download for file: {Filename}, user: {UserId}, fileId: {FileId}", filename, userId, fileId);
 
-                // Wait if file is currently downloading
-                await _fileLockService.WaitUntilReadyAsync(localFilePath);
+                // Create directory if it doesn't exist
+                Directory.CreateDirectory(inputDir);
 
-                // Check again after waiting
-                if (File.Exists(localFilePath) && _fileLockService.GetStatus(localFilePath) == FileStatus.Ready)
-                {
-                    _logger.LogInformation("📁 File became ready while waiting: {Path}", localFilePath);
-                    // FileUsageTracker.Increment(localFilePath);
-                    return localFilePath;
-                }
+                // Generate SAS URL for the blob
+                var sasUrl = await GenerateSasUriAsync(filename);
 
-                // Try to acquire download lock
-                if (!await _fileLockService.TryAcquireDownloadLockAsync(localFilePath))
-                {
-                    // Another thread is downloading or file became ready
-                    await _fileLockService.WaitUntilReadyAsync(localFilePath);
+                // Use HttpClient to download the file
+                using var httpClient = new HttpClient();
+                using var response = await httpClient.GetAsync(sasUrl, HttpCompletionOption.ResponseHeadersRead);
+                response.EnsureSuccessStatusCode();
 
-                    if (File.Exists(localFilePath) && _fileLockService.GetStatus(localFilePath) == FileStatus.Ready)
-                    {
-                        // FileUsageTracker.Increment(localFilePath);
-                        return localFilePath;
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException("File download failed or file not ready after waiting");
-                    }
-                }
+                // Write the content to a local file
+                await using var fs = new FileStream(localFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
+                await response.Content.CopyToAsync(fs);
 
-                // We have the download lock, proceed with download
-                try
-                {
-                    _logger.LogInformation("⬇️ Starting download: {Filename} for user {UserId}, file {FileId}", filename, userId, fileId);
-
-                    // Ensure directory exists
-                    Directory.CreateDirectory(inputDir);
-
-                    // Perform the actual download
-                    var sasUrl = await GenerateSasUriAsync(filename);
-                    using var httpClient = new HttpClient();
-                    using var response = await httpClient.GetAsync(sasUrl, HttpCompletionOption.ResponseHeadersRead);
-                    response.EnsureSuccessStatusCode();
-
-                    await using var fs = new FileStream(localFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
-                    await response.Content.CopyToAsync(fs);
-
-                    // Mark as ready
-                    _fileLockService.MarkReady(localFilePath);
-                    _logger.LogInformation("✅ Download completed: {Path}", localFilePath);
-
-                    // FileUsageTracker.Increment(localFilePath);
-                    return localFilePath;
-                }
-                catch (Exception ex)
-                {
-                    // Reset status on error
-                    _fileLockService.Reset(localFilePath);
-                    _logger.LogError(ex, "❌ Error downloading video: {Filename} for user {UserId}, file {FileId}", filename, userId, fileId);
-                    throw;
-                }
+                _logger.LogInformation("✅ Download completed: {LocalPath}", localFilePath);
+                return localFilePath;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ Error in DownloadVideoToLocalAsync: {Filename} for user {UserId}, file {FileId}", filename, userId, fileId);
+                _logger.LogError(ex, "❌ Error downloading video: {Filename} for user {UserId}, file {FileId}", filename, userId, fileId);
                 throw;
             }
         }
-
-
 
         // New method to upload thumbnail to blob storage
         public async Task<string> UploadThumbnailAsync(Stream thumbnailStream, string thumbnailFileName, int fileId, string fileName)
@@ -480,7 +428,7 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
         }
 
 
-    
+
         public string GenerateThumbnailSasUri(string thumbnailBlobPath, int hoursExpiry = 24)
         {
             try

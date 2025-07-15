@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
-using VideoTranscoder.VideoTranscoder.Application.enums;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
 using VideoTranscoder.VideoTranscoder.Domain.Entities;
 
@@ -10,22 +8,18 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
     {
         private readonly ILogger<FFmpegService> _logger;
         private readonly ICloudStorageService _cloudStorageService;
-          private readonly LocalCleanerService _cleanerService;
-        
-        private readonly IEncryptionService _encyptionService;
-        private readonly FileLockService _fileLockService;
+        private readonly LocalCleanerService _cleanerService;
 
 
 
-        public FFmpegService(ILogger<FFmpegService> logger, LocalCleanerService cleanerService, IEncryptionService encyptionService, ICloudStorageService cloudStorageService, FileLockService fileLockService)
+
+        public FFmpegService(ILogger<FFmpegService> logger, LocalCleanerService cleanerService, ICloudStorageService cloudStorageService)
         {
             _logger = logger;
             _cloudStorageService = cloudStorageService;
-            _encyptionService = encyptionService;
-            _fileLockService = fileLockService;
             _cleanerService = cleanerService;
         }
-        public async Task<string> TranscodeToCMAFAsync(string filename, int userId, int fileId, EncodingProfile encodingProfile)
+        public async Task<string> TranscodeToCMAFAsync(string filePath, string fileName, int userId, int fileId, EncodingProfile encodingProfile)
         {
             // Ensure output directory exists
             string currentDir = Directory.GetCurrentDirectory();
@@ -39,18 +33,16 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             Directory.CreateDirectory(hlsDir);
             Directory.CreateDirectory(dashDir);
 
-            // Use the download service which handles locking internally
-            string inputPath = await _cloudStorageService.DownloadVideoToLocalAsync(filename, userId, fileId);
 
             // Build FFmpeg command based on profile type
             string ffmpegArgs;
             if (encodingProfile.FormatType?.ToLower() == "dash")
             {
-                ffmpegArgs = $"-y -i \"{inputPath}\" {encodingProfile.FfmpegArgs} \"{dashDir}/manifest.mpd\"";
+                ffmpegArgs = $"-y -i \"{filePath}\" {encodingProfile.FfmpegArgs} \"{dashDir}/manifest.mpd\"";
             }
             else if (encodingProfile.FormatType?.ToLower() == "hls")
             {
-                ffmpegArgs = $"-y -i \"{inputPath}\" {encodingProfile.FfmpegArgs} " +
+                ffmpegArgs = $"-y -i \"{filePath}\" {encodingProfile.FfmpegArgs} " +
                              $"-hls_segment_filename \"{hlsDir}/segment_%03d.m4s\" " +
                              $"\"{hlsDir}/playlist.m3u8\"";
             }
@@ -64,14 +56,14 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             try
             {
                 await RunFFmpegAsync(ffmpegArgs);
-                return await _cloudStorageService.UploadTranscodedOutputAsync(outputDir, filename, fileId, userId, encodingProfile.Id);
+                return await _cloudStorageService.UploadTranscodedOutputAsync(outputDir, fileName, fileId, userId, encodingProfile.Id);
 
             }
             finally
             {
-                
-                
-               await _cleanerService.CleanDirectoryContentsAsync(outputDir);
+
+
+                await _cleanerService.CleanDirectoryContentsAsync(outputDir);
 
 
             }
@@ -211,7 +203,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
 
                 }
                 Console.WriteLine("FFmpeg Thumbnail Generation completed successfully.");
-            
+
                 // Reset stream position for reading
                 thumbnailStream.Position = 0;
 
@@ -224,7 +216,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                 throw;
             }
         }
-        public async Task<string> GenerateMultipleThumbnailsAsync(string fileName, int userId, int fileId)
+        public async Task<string> GenerateMultipleThumbnailsAsync(int userId, int fileId, string filePath)
         {
             try
             {
@@ -232,16 +224,14 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                 string thumbnailDir = Path.Combine(currentDir, "temp", $"{userId}", $"{fileId}", "thumbnails");
                 Directory.CreateDirectory(thumbnailDir);
 
-                // 1. Download video to local path
-                string inputPath = Path.Combine(currentDir, "input", $"{userId}", $"{fileId}", "videos", fileName);
 
                 // Check if input file exists
-                if (!File.Exists(inputPath))
-                    throw new FileNotFoundException($"Input video file not found: {inputPath}");
+                if (!File.Exists(filePath))
+                    throw new FileNotFoundException($"Input video file not found: {filePath}");
 
                 // 2. Generate thumbnails with proper output pattern
                 string outputPattern = Path.Combine(thumbnailDir, "thumb_%03d.jpg");
-                string ffmpegArgs = $"-i \"{inputPath}\" -vf fps=1/5,scale=320:180 -frames:v 5 \"{outputPattern}\"";
+                string ffmpegArgs = $"-i \"{filePath}\" -vf fps=1/5,scale=320:180 -frames:v 5 \"{outputPattern}\"";
 
                 var psi = new ProcessStartInfo
                 {
