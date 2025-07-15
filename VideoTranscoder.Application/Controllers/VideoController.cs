@@ -29,7 +29,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
         public async Task<IActionResult> MergeCompleteAndRequestThumbnailUrl([FromBody] MergeRequestDto request)
         {
             int userId = _authService.GetCurrentUserId(User);
-            Console.WriteLine(userId);
+            // Console.WriteLine(userId);
 
             var thumbnailUrl = await _videoService.StoreFileAndReturnThumbnailUrlAsync(
                 request.TotalChunks,

@@ -18,16 +18,18 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
         private readonly IUserService _userService;
         private readonly ILogger<AzureBlobStorageService> _logger;
         private readonly FileLockService _fileLockService;
+        private readonly LocalCleanerService _cleanerService;
 
 
 
-        public AzureBlobStorageService(FileLockService fileLockService, ILogger<AzureBlobStorageService> logger, IOptions<AzureOptions> azureOptions, BlobServiceClient blobServiceClient, IUserService userService)
+        public AzureBlobStorageService(FileLockService fileLockService, LocalCleanerService clearService, ILogger<AzureBlobStorageService> logger, IOptions<AzureOptions> azureOptions, BlobServiceClient blobServiceClient, IUserService userService)
         {
             _azureOptions = azureOptions.Value;
             _blobServiceClient = blobServiceClient;
             _userService = userService;
             _logger = logger;
             _fileLockService = fileLockService;
+            _cleanerService = clearService;
         }
 
         public async Task<string> GenerateSasUriAsync(string fileName)
@@ -256,10 +258,11 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
                         }
                     }
                 }
+             await _cleanerService.CleanDirectoryContentsAsync(tempOutputDir);
 
                 if (firstUploadedBlobPath == null)
                     throw new Exception("❌ Upload failed: No files were uploaded to blob storage.");
-
+ 
                 return firstUploadedBlobPath;
             }
             catch (Exception ex)
@@ -477,7 +480,7 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
         }
 
 
-        // New method to generate thumbnail URL (if you need public access)
+    
         public string GenerateThumbnailSasUri(string thumbnailBlobPath, int hoursExpiry = 24)
         {
             try

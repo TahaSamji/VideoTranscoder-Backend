@@ -93,7 +93,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                 try
                 {
                     string videoBlobpath = await _ffmpegService.TranscodeToCMAFAsync(videoFile.OriginalFilename, videoFile.UserId, videoFile.Id, encodingProfile);
-                    
+
                     await _transcodingJobRepository.UpdateStatusAsync(Job.Id, "Completed");
                     string outputfile = "";
                     if (encodingProfile.FormatType == "hls")
@@ -111,11 +111,11 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
 
                         TranscodingJobId = Job.Id,
                         Type = encodingProfile.FormatType,
-                        BlobPath = videoBlobpath, // or manifest.mpd
+                        BlobPath = videoBlobpath,
                         Resolution = encodingProfile.Resolution,
                         BitrateKbps = encodingProfile.Bitrate,
-                        Size = 0, // Optional: use ICloudStorageService to get blob size
-                        DurationSeconds = 0, // Optional: extract from metadata if needed
+                        Size = 0,
+                        DurationSeconds = 0,
                         CreatedAt = DateTime.UtcNow,
                         VideoURL = videoUrl // or manifest.mpd
                     };
@@ -123,13 +123,15 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                     await _videoVariantRepository.SaveAsync(variant);
                     _logger.LogInformation("🎞️ Video variant saved.");
                     int thumbnailCount = await _thumbnailService.CountThumbnailsForFileAsync(videoFile.Id);
-                    if (thumbnailCount < 6)
+                    if (thumbnailCount < 2)
                     {
                         await _thumbnailService.GenerateAndStoreThumbnailsAsync(videoFile.OriginalFilename, videoFile.UserId, videoFile.Id);
                         _logger.LogInformation("Thumbnails Saved .");
+
                     }
-                        
-                    // await _cleanerService.CleanDirectoryContentsAsync("temp");
+
+
+
                     // await _cleanerService.CleanDirectoryContentsAsync("input");
 
                 }

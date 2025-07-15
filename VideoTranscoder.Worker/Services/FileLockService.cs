@@ -14,8 +14,11 @@ public class FileLockService
     public async Task WaitUntilReadyAsync(string filePath)
     {
         while (true)
-        {
+        {  
+
+            
             var status = GetStatus(filePath);
+            Console.WriteLine($"Still Waiting {status}");
             
             if (status == FileStatus.Ready)
             {

@@ -9,12 +9,13 @@ public class ThumbnailService : IThumbnailService
     private readonly FFmpegService _ffmpegService;
     private readonly ILogger<ThumbnailService> _logger;
     private readonly IThumbnailRepository _thumbnailRepository;
-        private readonly IVideoRepository _videoRepository;
+    private readonly IVideoRepository _videoRepository;
     private readonly ICloudStorageService _cloudStorageService;
+    private readonly LocalCleanerService _cleanerService;
     private readonly IMapper _thumbnailMapper;
 
 
-    public ThumbnailService(IMapper thumbnailMapper, IVideoRepository videoRepository, ICloudStorageService cloudStorageService, IThumbnailRepository thumbnailRepository, FFmpegService fFmpegService, ILogger<ThumbnailService> logger)
+    public ThumbnailService(IMapper thumbnailMapper,LocalCleanerService cleanerService, IVideoRepository videoRepository, ICloudStorageService cloudStorageService, IThumbnailRepository thumbnailRepository, FFmpegService fFmpegService, ILogger<ThumbnailService> logger)
     {
         _thumbnailRepository = thumbnailRepository;
         _logger = logger;
@@ -22,62 +23,84 @@ public class ThumbnailService : IThumbnailService
         _cloudStorageService = cloudStorageService;
         _thumbnailMapper = thumbnailMapper;
         _videoRepository = videoRepository;
+        _cleanerService = cleanerService;
 
     }
-    // public async Task GenerateAndStoreThumbnailsAsync(string fileName, int userId, int fileId)
-    // {
-    //     string thumbnailPath = await _ffmpegService.GenerateMultipleThumbnailsAsync(fileName, userId, fileId);
-    //     List<string> thumbnailBlobPaths = await _cloudStorageService.UploadThumbnailsFromDirectoryAsync(thumbnailPath, fileId, fileName, userId);
-    //     _logger.LogInformation("Thumbnails Stored to Blob Succesfully ", thumbnailBlobPaths);
-    //     // await _thumbnailRepository.SaveAsync();
-    //     // Convert blob URLs to Thumbnail metadata entities
-    //     var thumbnails = thumbnailBlobPaths.Select((url, index) =>
-       
-    //         new Thumbnail
-    //         {
-    //             FileId = fileId,
-    //             BlobUrl = $"https://task1storageaccount.blob.core.windows.net/uploads/{url}",
-    //             TimeOffset = $"00:00:{(index + 1) * 5:00}",
-    //             IsDefault = false,
-    //             CreatedAt = DateTime.UtcNow
-    //         }).ToList();
-
-    //     // Save thumbnail metadata to the database
-    //     await _thumbnailRepository.SaveAllAsync(thumbnails);
-
-    //     _logger.LogInformation($"✅ Saved {thumbnails.Count} thumbnails to the database.");
-
-    // }
-    public async Task GenerateAndStoreThumbnailsAsync(string fileName, int userId, int fileId)
-{
-    string thumbnailPath = await _ffmpegService.GenerateMultipleThumbnailsAsync(fileName, userId, fileId);
-    List<string> thumbnailBlobPaths = await _cloudStorageService.UploadThumbnailsFromDirectoryAsync(thumbnailPath, fileId, fileName, userId);
-    
-    _logger.LogInformation("Thumbnails stored to Blob successfully: {@Paths}", thumbnailBlobPaths);
-
-    var thumbnails = new List<Thumbnail>();
-
-    for (int index = 0; index < thumbnailBlobPaths.Count; index++)
-    {
-        var blobPath = thumbnailBlobPaths[index];
-
-        // Generate a SAS URL for this blob path
-        string sasUrl = await _cloudStorageService.GenerateBlobSasUriAsync(blobPath);
-
-        var thumbnail = new Thumbnail
+    public async Task<string> GenerateDefaultThumbnailAsync(string outputFileName, int userId, int videoId)
         {
-            FileId = fileId,
-            BlobUrl = sasUrl, // ✅ Use secure SAS URL
-            TimeOffset = $"00:00:{(index + 1) * 5:00}",
-            IsDefault = false,
-            CreatedAt = DateTime.UtcNow
-        };
+            try
+            {
+                _logger.LogInformation("🎬 Starting default thumbnail generation for videoId: {VideoId}, userId: {UserId}, fileName: {FileName}", videoId, userId, outputFileName);
 
-        thumbnails.Add(thumbnail);
-    }
+                var thumbnailStream = await _ffmpegService.GenerateThumbnailFromDirAsync("00:00:05", outputFileName, userId, videoId);
 
-    await _thumbnailRepository.SaveAllAsync(thumbnails);
-    _logger.LogInformation("✅ Saved {Count} thumbnails to the database with SAS URLs.", thumbnails.Count);
+                var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(outputFileName);
+                var extension = Path.GetExtension(outputFileName);
+                var thumbnailFileName = $"{fileNameWithoutExtension}_thumb_{userId}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.jpg";
+
+                _logger.LogDebug("📝 Thumbnail file name generated: {ThumbnailFileName}", thumbnailFileName);
+
+                var thumbnailBlobPath = await _cloudStorageService.UploadThumbnailAsync(thumbnailStream, thumbnailFileName, videoId, outputFileName);
+
+                var thumbnailUrl = _cloudStorageService.GenerateThumbnailSasUri(thumbnailBlobPath);
+
+                _logger.LogInformation("✅ Thumbnail uploaded to blob storage at path: {BlobPath}", thumbnailBlobPath);
+                _logger.LogInformation("🌐 Thumbnail accessible at: {ThumbnailUrl}", thumbnailUrl);
+
+                var thumbnail = new Thumbnail
+                {
+                    FileId = videoId,
+                    IsDefault = true,
+                    BlobUrl = thumbnailUrl,
+                    TimeOffset = "00:00:05",
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await _thumbnailRepository.SaveAsync(thumbnail);
+
+                _logger.LogInformation("🗄️ Thumbnail metadata saved to DB for videoId: {VideoId}", videoId);
+
+                return thumbnailUrl;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error generating or saving default thumbnail for videoId: {VideoId}", videoId);
+                throw;
+            }
+        }
+    public async Task GenerateAndStoreThumbnailsAsync(string fileName, int userId, int fileId)
+    {
+        string thumbnailPath = await _ffmpegService.GenerateMultipleThumbnailsAsync(fileName, userId, fileId);
+          _logger.LogInformation("Thumbnails stored to local successfully {thumbnailPath}:", thumbnailPath);
+        List<string> thumbnailBlobPaths = await _cloudStorageService.UploadThumbnailsFromDirectoryAsync(thumbnailPath, fileId, fileName, userId);
+
+        _logger.LogInformation("Thumbnails stored to Blob successfully: {@Paths}", thumbnailBlobPaths);
+
+        var thumbnails = new List<Thumbnail>();
+
+        for (int index = 0; index < thumbnailBlobPaths.Count; index++)
+        {
+            var blobPath = thumbnailBlobPaths[index];
+
+            // Generate a SAS URL for this blob path
+            string sasUrl = await _cloudStorageService.GenerateBlobSasUriAsync(blobPath);
+
+            var thumbnail = new Thumbnail
+            {
+                FileId = fileId,
+                BlobUrl = sasUrl, // ✅ Use secure SAS URL
+                TimeOffset = $"00:00:{(index + 1) * 5:00}",
+                IsDefault = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            thumbnails.Add(thumbnail);
+        }
+
+        await _thumbnailRepository.SaveAllAsync(thumbnails);
+        _logger.LogInformation("✅ Saved {Count} thumbnails to the database with SAS URLs.", thumbnails.Count);
+      _logger.LogInformation($"✅ This  is the .{thumbnailPath}");
+         await _cleanerService.CleanDirectoryContentsAsync(thumbnailPath);
 }
 
     public async Task<List<ThumbnailDto>> GetAllThumbnailsAsync(int fileId)

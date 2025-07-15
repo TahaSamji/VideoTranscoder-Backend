@@ -10,23 +10,26 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
     {
         private readonly ILogger<FFmpegService> _logger;
         private readonly ICloudStorageService _cloudStorageService;
+          private readonly LocalCleanerService _cleanerService;
+        
         private readonly IEncryptionService _encyptionService;
         private readonly FileLockService _fileLockService;
 
 
 
-        public FFmpegService(ILogger<FFmpegService> logger, IEncryptionService encyptionService, ICloudStorageService cloudStorageService, FileLockService fileLockService)
+        public FFmpegService(ILogger<FFmpegService> logger, LocalCleanerService cleanerService, IEncryptionService encyptionService, ICloudStorageService cloudStorageService, FileLockService fileLockService)
         {
             _logger = logger;
             _cloudStorageService = cloudStorageService;
             _encyptionService = encyptionService;
             _fileLockService = fileLockService;
+            _cleanerService = cleanerService;
         }
         public async Task<string> TranscodeToCMAFAsync(string filename, int userId, int fileId, EncodingProfile encodingProfile)
         {
             // Ensure output directory exists
             string currentDir = Directory.GetCurrentDirectory();
-            var outputDir = Path.Combine(currentDir, "temp", $"{userId}", $"{fileId}", $"{encodingProfile.Id}", "output");
+            var outputDir = Path.Combine(currentDir, "temp", $"{userId}", $"{fileId}", $"{encodingProfile.Id}");
             Directory.CreateDirectory(outputDir);
 
             // Create subdirectories for HLS and DASH
@@ -62,11 +65,15 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             {
                 await RunFFmpegAsync(ffmpegArgs);
                 return await _cloudStorageService.UploadTranscodedOutputAsync(outputDir, filename, fileId, userId, encodingProfile.Id);
+
             }
             finally
             {
-                // Decrement usage tracker when done
-                FileUsageTracker.Decrement(inputPath);
+                
+                
+               await _cleanerService.CleanDirectoryContentsAsync(outputDir);
+
+
             }
         }
 
