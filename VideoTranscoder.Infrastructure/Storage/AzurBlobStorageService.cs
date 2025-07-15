@@ -258,7 +258,7 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
                         }
                     }
                 }
-             await _cleanerService.CleanDirectoryContentsAsync(tempOutputDir);
+            //  await _cleanerService.CleanDirectoryContentsAsync(tempOutputDir);
 
                 if (firstUploadedBlobPath == null)
                     throw new Exception("❌ Upload failed: No files were uploaded to blob storage.");
