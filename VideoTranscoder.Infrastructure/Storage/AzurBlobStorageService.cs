@@ -4,10 +4,8 @@ using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
 using Microsoft.Extensions.Options;
 using VideoTranscoder.VideoTranscoder.Application.Configurations;
-using VideoTranscoder.VideoTranscoder.Application.enums;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
-using VideoTranscoder.VideoTranscoder.Application.Services;
-using VideoTranscoder.VideoTranscoder.Worker.Services;
+
 
 namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
 {
@@ -20,7 +18,7 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
 
 
 
-        public AzureBlobStorageService( ILogger<AzureBlobStorageService> logger, IOptions<AzureOptions> azureOptions, BlobServiceClient blobServiceClient, IUserService userService)
+        public AzureBlobStorageService(ILogger<AzureBlobStorageService> logger, IOptions<AzureOptions> azureOptions, BlobServiceClient blobServiceClient, IUserService userService)
         {
             _azureOptions = azureOptions.Value;
             _blobServiceClient = blobServiceClient;
@@ -32,68 +30,89 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
         {
             try
             {
+                // Get current authenticated user's ID
                 int userId = _userService.UserId;
+
+                // Build blob name based on userId and file name
                 string blobName = $"{userId}/{fileName}";
                 string containerName = _azureOptions.ContainerName;
 
+                // Get reference to blob container
                 var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+
+                // Create the container if it doesn't already exist
                 await containerClient.CreateIfNotExistsAsync();
+
+                // Get reference to the specific blob
                 var blobClient = containerClient.GetBlobClient(blobName);
 
-
+                // Create a SAS token builder
                 var sasBuilder = new BlobSasBuilder
                 {
-                    BlobContainerName = containerName,
-                    BlobName = blobName,
-                    Resource = "b",
-                    StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5),
-                    ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
+                    BlobContainerName = containerName,   // Name of the container
+                    BlobName = blobName,                 // Name of the blob
+                    Resource = "b",                      // "b" stands for blob resource
+                    StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5), // Valid from 5 minutes ago to account for clock skew
+                    ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)    // SAS token valid for 1 hour
                 };
 
+                // Set the permissions on the blob: read, create, write
                 sasBuilder.SetPermissions(BlobSasPermissions.Read | BlobSasPermissions.Create | BlobSasPermissions.Write);
+
+                // Generate the SAS URI using the builder
                 var sasUri = blobClient.GenerateSasUri(sasBuilder);
 
-
+                // Return the URI as a string
                 return sasUri.ToString();
             }
             catch (Exception ex)
             {
+                // Log and rethrow any error encountered during SAS generation
                 Console.WriteLine("❌ Error generating SAS URI: " + ex.Message);
                 throw;
             }
         }
 
-        public async Task<string> GenerateBlobSasUriAsync(string StoragePath)
+
+        public async Task<string> GenerateBlobSasUriAsync(string storagePath)
         {
             try
             {
-
-                string blobPath = StoragePath;
+                // Extract blob path and container name
+                string blobPath = storagePath;
                 string containerName = _azureOptions.ContainerName;
 
+                // Get the container client
                 var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+
+                // Ensure the container exists
                 await containerClient.CreateIfNotExistsAsync();
+
+                // Get the blob client for the specific file
                 var blobClient = containerClient.GetBlobClient(blobPath);
 
-
+                // Build SAS token with read, write, and create permissions
                 var sasBuilder = new BlobSasBuilder
                 {
                     BlobContainerName = containerName,
                     BlobName = blobPath,
-                    Resource = "b",
-                    StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5),
-                    ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
+                    Resource = "b", // 'b' indicates blob-level SAS
+                    StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5), // Slightly in the past to account for clock skew
+                    ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)    // Valid for 1 hour
                 };
 
                 sasBuilder.SetPermissions(BlobSasPermissions.Read | BlobSasPermissions.Create | BlobSasPermissions.Write);
+
+                // Generate SAS URI
                 var sasUri = blobClient.GenerateSasUri(sasBuilder);
 
+                _logger.LogInformation("✅ Generated SAS URI for blob: {BlobPath}", blobPath);
 
                 return sasUri.ToString();
             }
             catch (Exception ex)
             {
-                Console.WriteLine("❌ Error generating SAS URI: " + ex.Message);
+                _logger.LogError(ex, "❌ Error generating blob SAS URI for path: {BlobPath}", storagePath);
                 throw;
             }
         }
@@ -102,43 +121,53 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
         {
             try
             {
+                // Get container name from config
                 string containerName = _azureOptions.ContainerName;
 
+                // Get container client
                 var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+
+                // Ensure container exists
                 await containerClient.CreateIfNotExistsAsync();
 
+                // Create a SAS builder for container-level access
                 var sasBuilder = new BlobSasBuilder
                 {
                     BlobContainerName = containerName,
-                    Resource = "c", // 'c' means container-level SAS
-                    StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5),
-                    ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
+                    Resource = "c", // "c" indicates container-level SAS
+                    StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5), // Buffer to account for clock skew
+                    ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)    // 1-hour validity
                 };
 
-                // Only READ access is needed for playback
+                // Grant read permissions for the entire container (sufficient for video playback)
                 sasBuilder.SetPermissions(BlobContainerSasPermissions.Read);
 
+                // Generate the SAS URI
                 var sasUri = containerClient.GenerateSasUri(sasBuilder);
+
+                _logger.LogInformation("✅ Generated container-level SAS URI: {SasUri}", sasUri);
                 return sasUri.ToString();
             }
             catch (Exception ex)
             {
-                Console.WriteLine("❌ Error generating container SAS URI: " + ex.Message);
+                // Error Creating SAS URI
+                _logger.LogError(ex, "❌ Error generating container SAS URI");
                 throw;
             }
         }
 
-
-            public async Task<string> UploadTranscodedOutputAsync(string tempOutputDir, string fileName, int fileId, int userId, int encodingProfileId)
+        public async Task<string> UploadTranscodedOutputAsync(string tempOutputDir, string fileName, int fileId, int userId, int encodingProfileId)
         {
             try
             {
+                // Check if the local temp output directory exists
                 if (!Directory.Exists(tempOutputDir))
                     throw new DirectoryNotFoundException($"❌ Temp output directory not found: {tempOutputDir}");
 
                 string containerName = _azureOptions.ContainerName;
                 var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
 
+                // Ensure the container exists
                 await containerClient.CreateIfNotExistsAsync();
 
                 string[] formats = ["hls", "dash"];
@@ -148,9 +177,10 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
                 {
                     var subDir = Path.Combine(tempOutputDir, format);
 
+                    // Skip if format directory doesn't exist
                     if (!Directory.Exists(subDir))
                     {
-                        Console.WriteLine($"⚠️ Skipped: Directory not found for format '{format}': {subDir}");
+                        _logger.LogWarning("⚠️ Skipped: Directory not found for format '{Format}': {SubDir}", format, subDir);
                         continue;
                     }
 
@@ -163,14 +193,17 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
 
                         try
                         {
+                            // Create a relative blob path
                             var relativePath = Path.GetRelativePath(tempOutputDir, localFilePath).Replace("\\", "/");
                             blobPath = $"{transcodedPath}/{relativePath}";
 
+                            // Upload the file to blob
                             using var fileStream = File.OpenRead(localFilePath);
                             var blobClient = containerClient.GetBlobClient(blobPath);
 
                             await blobClient.UploadAsync(fileStream, overwrite: true);
 
+                            // Set the appropriate content type
                             var contentType = Path.GetExtension(blobPath).ToLower() switch
                             {
                                 ".m3u8" => "application/vnd.apple.mpegurl",
@@ -182,20 +215,23 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
 
                             await blobClient.SetHttpHeadersAsync(new BlobHttpHeaders { ContentType = contentType });
 
-                            Console.WriteLine($"✅ Uploaded: {blobPath}");
+                            _logger.LogInformation("✅ Uploaded: {BlobPath}", blobPath);
 
-                            // Save first uploaded blob path
+                            // Save the path of the first successfully uploaded file
                             firstUploadedBlobPath ??= transcodedPath;
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"❌ Failed to upload file '{localFilePath}' to '{blobPath}': {ex.Message}");
-                            // Don't throw here — continue with next file
+                            // Log and continue on file-level failure
+                            _logger.LogError(ex, "❌ Failed to upload file '{LocalPath}' to '{BlobPath}'", localFilePath, blobPath);
                         }
                     }
                 }
-                //  await _cleanerService.CleanDirectoryContentsAsync(tempOutputDir);
 
+                // Uncomment if you want to clean local files afterward
+                // await _cleanerService.CleanDirectoryContentsAsync(tempOutputDir);
+
+                // Ensure at least one file was uploaded
                 if (firstUploadedBlobPath == null)
                     throw new Exception("❌ Upload failed: No files were uploaded to blob storage.");
 
@@ -203,7 +239,7 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Fatal error in UploadTranscodedOutputAsync: {ex.Message}");
+                _logger.LogError(ex, "❌ Fatal error in UploadTranscodedOutputAsync");
                 throw;
             }
         }
@@ -212,7 +248,7 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
         public async Task<string> DownloadVideoToLocalAsync(string filename, int userId, int fileId)
         {
             string currentDir = Directory.GetCurrentDirectory();
-            string inputDir = Path.Combine(currentDir, "input", $"{userId}", $"{fileId}", "videos");
+            string inputDir = Path.Combine(currentDir, "input", $"{userId}", $"{fileId}");
             string localFilePath = Path.Combine(inputDir, filename);
 
             try
@@ -249,30 +285,41 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
         {
             try
             {
+                // Get container name and user ID
                 string containerName = _azureOptions.ContainerName;
-                var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
-                await containerClient.CreateIfNotExistsAsync();
                 int userId = _userService.UserId;
-                // Create thumbnail path in thumbnails directory
+
+                // Build the blob path for the thumbnail
                 var thumbnailBlobPath = $"{userId}/{fileName}_{fileId}/thumbnails/{thumbnailFileName}";
+
+                // Get blob container client
+                var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+
+                // Create the container if it doesn't exist
+                await containerClient.CreateIfNotExistsAsync();
+
+                // Get the blob client for the specific thumbnail
                 var blobClient = containerClient.GetBlobClient(thumbnailBlobPath);
 
-                // Upload thumbnail
-                thumbnailStream.Position = 0; // Reset stream position
+                // Reset stream position and upload the thumbnail to the blob
+                thumbnailStream.Position = 0;
                 await blobClient.UploadAsync(thumbnailStream, overwrite: true);
 
-                // Set content type for thumbnail
+                // Set appropriate content type
                 await blobClient.SetHttpHeadersAsync(new BlobHttpHeaders
                 {
                     ContentType = "image/jpeg"
                 });
 
-                Console.WriteLine($"✅ Successfully uploaded thumbnail: {thumbnailBlobPath}");
+                // Log successful upload
+                _logger.LogInformation("✅ Successfully uploaded thumbnail: {BlobPath}", thumbnailBlobPath);
+
                 return thumbnailBlobPath;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("❌ Error in UploadThumbnailAsync: " + ex.Message);
+                // Log error and rethrow
+                _logger.LogError(ex, "❌ Error in UploadThumbnailAsync for fileId: {FileId}, fileName: {FileName}", fileId, fileName);
                 throw;
             }
         }
@@ -281,42 +328,57 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
             var uploaded = new List<string>();
             try
             {
+                // Check if the thumbnail directory exists
                 if (!Directory.Exists(localDirectoryPath))
                     throw new DirectoryNotFoundException($"Thumbnail directory not found: {localDirectoryPath}");
 
+                // Get container name from configuration
                 string containerName = _azureOptions.ContainerName;
+
+                // Get reference to the blob container
                 var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+
+                // Ensure the container exists or create it if it doesn't
                 await containerClient.CreateIfNotExistsAsync();
 
+                // Construct the blob path where thumbnails will be uploaded
                 string thumbnailDirectoryBlobPath = $"{userId}/{originalFileName}_{fileId}/thumbnails";
 
+                // Get all thumbnail file paths from the local directory
                 var thumbnailFiles = Directory.GetFiles(localDirectoryPath);
 
+                // Iterate over each thumbnail file and upload it
                 foreach (var thumbnailPath in thumbnailFiles)
                 {
-                    var fileName = Path.GetFileName(thumbnailPath);
-                    var blobPath = $"{thumbnailDirectoryBlobPath}/{fileName}";
-                    var blobClient = containerClient.GetBlobClient(blobPath);
+                    var fileName = Path.GetFileName(thumbnailPath); // Extract filename from path
+                    var blobPath = $"{thumbnailDirectoryBlobPath}/{fileName}"; // Complete blob path for each thumbnail
+                    var blobClient = containerClient.GetBlobClient(blobPath); // Get blob client
 
-                    await using var stream = File.OpenRead(thumbnailPath);
-                    stream.Position = 0;
+                    await using var stream = File.OpenRead(thumbnailPath); // Open the file stream
+                    stream.Position = 0; // Reset stream position in case it's not at the beginning
 
+                    // Upload the stream to Azure Blob Storage with overwrite enabled
                     await blobClient.UploadAsync(stream, overwrite: true);
 
+                    // Set the content type for the blob as JPEG
                     await blobClient.SetHttpHeadersAsync(new BlobHttpHeaders
                     {
                         ContentType = "image/jpeg"
                     });
 
+                    // Add the uploaded blob path to the result list
                     uploaded.Add(blobPath);
-                    Console.WriteLine($"✅ Uploaded thumbnail: {blobPath}");
+
+                    // Log success (can be replaced with ILogger if needed)
+                    _logger.LogInformation($"✅ Uploaded thumbnail: {blobPath}");
                 }
 
                 return uploaded;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("❌ Error in UploadThumbnailsFromDirectoryAsync: " + ex.Message);
+                // Log error and rethrow
+                _logger.LogInformation("❌ Error in UploadThumbnailsFromDirectoryAsync: {message} " + ex.Message);
                 throw;
             }
         }
@@ -327,30 +389,42 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
         {
             try
             {
+                // Retrieve the name of the container from configuration
                 string containerName = _azureOptions.ContainerName;
+
+                // Get reference to the container
                 var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+
+                // Get reference to the specific thumbnail blob
                 var blobClient = containerClient.GetBlobClient(thumbnailBlobPath);
 
+                // Create a new SAS builder to define the access parameters
                 var sasBuilder = new BlobSasBuilder
                 {
-                    BlobContainerName = containerName,
-                    BlobName = thumbnailBlobPath,
-                    Resource = "b",
-                    StartsOn = DateTimeOffset.UtcNow,
-                    ExpiresOn = DateTimeOffset.UtcNow.AddHours(hoursExpiry)
+                    BlobContainerName = containerName,                   // Set the target container
+                    BlobName = thumbnailBlobPath,                        // Set the target blob path
+                    Resource = "b",                                      // "b" denotes that the resource is a blob
+                    StartsOn = DateTimeOffset.UtcNow,                    // SAS token becomes valid immediately
+                    ExpiresOn = DateTimeOffset.UtcNow.AddHours(hoursExpiry) // SAS token expiration
                 };
 
+                // Grant read and write permissions for the blob
                 sasBuilder.SetPermissions(BlobSasPermissions.Read | BlobSasPermissions.Write);
+
+                // Generate the full URI with SAS token
                 var sasUri = blobClient.GenerateSasUri(sasBuilder);
 
+                // Return the URI as a string
                 return sasUri.ToString();
             }
             catch (Exception ex)
             {
+                // Log and rethrow the exception in case of failure
                 Console.WriteLine("❌ Error generating thumbnail SAS URI: " + ex.Message);
                 throw;
             }
         }
+
 
 
 

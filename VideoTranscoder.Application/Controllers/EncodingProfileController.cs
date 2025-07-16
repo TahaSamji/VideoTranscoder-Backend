@@ -5,12 +5,9 @@ using VideoTranscoder.VideoTranscoder.Domain.Entities;
 
 namespace VideoTranscoder.VideoTranscoder.Application.Controllers
 {
-
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = "Admin")]
-
-
     public class EncodingProfileController : ControllerBase
     {
         private readonly IEncodingProfileService _encodingProfileService;
@@ -20,7 +17,9 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
             _encodingProfileService = encodingProfileService;
         }
 
-
+        /// <summary>
+        /// Creates a new encoding profile.
+        /// </summary>
         [HttpPost("create-encoding-profiles")]
         public async Task<IActionResult> CreateEncodingProfile([FromBody] EncodingProfile profile)
         {
@@ -30,6 +29,9 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Retrieves all encoding profiles with pagination support.
+        /// </summary>
         [HttpGet("getallEncodings")]
         public async Task<IActionResult> GetAllEncodingProfiles([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {

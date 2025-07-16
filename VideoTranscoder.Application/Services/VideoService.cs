@@ -56,38 +56,44 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
         {
             try
             {
+                // Log the beginning of the rendition fetch process
                 _logger.LogInformation("🔍 Fetching video renditions for fileId: {FileId}", fileId);
 
+                // Fetch all completed video variants (renditions) for the given fileId
                 var variants = await _videoVariantRepository.GetVariantsByFileIdIfCompletedAsync(fileId);
 
+                // If no variants found, log a warning and return an empty list
                 if (variants == null || !variants.Any())
                 {
                     _logger.LogWarning("⚠️ No completed variants found for fileId: {FileId}", fileId);
                     return new List<VideoRenditionDto>();
                 }
 
+                // Convert variants into DTOs for response
                 var renditionDtos = variants.Select(v => new VideoRenditionDto
                 {
                     VariantId = v.Id,
                     Type = v.Type,
                     Resolution = v.Resolution,
                     BitrateKbps = v.BitrateKbps,
-                    Size = v.Size,
                     DurationSeconds = v.DurationSeconds,
                     VideoUrl = v.VideoURL,
                     CreatedAt = v.CreatedAt
                 }).ToList();
 
+                // Log success and count of found renditions
                 _logger.LogInformation("✅ Found {Count} renditions for fileId: {FileId}", renditionDtos.Count, fileId);
 
                 return renditionDtos;
             }
             catch (Exception ex)
             {
+                // Log any exception that occurs during processing
                 _logger.LogError(ex, "❌ Error while fetching video renditions for fileId: {FileId}", fileId);
                 throw;
             }
         }
+
         public async Task StoreFileAndGenerateThumbnailsAsync(MergeRequestDto request, int userId)
         {
             try
@@ -145,9 +151,9 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 var messages = encodingProfiles.Select(profile => new TranscodeRequestMessage
                 {
                     FileId = videoMetaData.Id,
-                    BlobPath = videoMetaData.BlobPath,
                     EncodingProfileId = profile.Id,
-                    LocalVideoPath = inputFilePath
+                    LocalVideoPath = inputFilePath,
+                    TotalRenditions = encodingProfiles.Count
                 }).ToList();
 
                 // ✅ Send as batch
@@ -189,11 +195,3 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
     }
 
 }
-
-
-// // 3. Upload thumbnail to blob
-// // await _blobService.UploadFileAsync(localOutputPath, thumbnailBlobPath);
-
-// // string queueName = _configuration["AzureServiceBus:TranscodeQueueName"]!;
-// // await _queuePublisher.SendMessageAsync(message, queueName);
-

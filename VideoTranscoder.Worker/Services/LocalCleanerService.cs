@@ -2,72 +2,52 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 
-public class LocalCleanerService
+namespace VideoTranscoder.VideoTranscoder.Worker.Services
 {
-    public async Task CleanDirectoryContentsAsync(string directoryPath)
+    /// <summary>
+    /// Service responsible for cleaning up local directories after processing.
+    /// </summary>
+    public class LocalCleanerService
     {
-
-        Console.WriteLine($"DirectoryPAth given {directoryPath}");
-        try
+        /// <summary>
+        /// Deletes the given directory and its contents recursively.
+        /// </summary>
+        /// <param name="directoryPath">Absolute path to the directory to be cleaned</param>
+        public async Task CleanDirectoryContentsAsync(string directoryPath)
         {
-            if (!Directory.Exists(directoryPath))
-            {
-                Console.WriteLine($"⚠️ Directory does not exist: {directoryPath}");
-                return;
-            }
-
-            // Delete all files
-            // foreach (var filePath in Directory.GetFiles(directoryPath))
-            // {
-            //     try
-            //     {
-            //         File.Delete(filePath);
-            //         Console.WriteLine($"🗑️ Deleted file: {filePath}");
-            //     }
-            //     catch (IOException ex)
-            //     {
-            //         Console.WriteLine($"❌ Could not delete file (locked?): {filePath}. {ex.Message}");
-            //     }
-            //     catch (UnauthorizedAccessException ex)
-            //     {
-            //         Console.WriteLine($"🚫 Permission denied for file: {filePath}. {ex.Message}");
-            //     }
-            // }
+            // Log the path received for cleanup
+            Console.WriteLine($"Directory Path given : {directoryPath}");
 
             try
             {
-                Directory.Delete(directoryPath, recursive: true); // Will fail if contents still exist
-                Console.WriteLine($"🗑️ Deleted root directory: {directoryPath}");
+                // Check if directory exists before attempting deletion
+                if (!Directory.Exists(directoryPath))
+                {
+                    Console.WriteLine($"⚠️ Directory does not exist: {directoryPath}");
+                    return; // Exit if the directory is not found
+                }
+
+                try
+                {
+                    // Attempt to delete the entire directory and all subdirectories/files
+                    Directory.Delete(directoryPath, recursive: true);
+                    Console.WriteLine($"🗑️ Deleted root directory: {directoryPath}");
+                }
+                catch (Exception ex)
+                {
+                    // Log any errors that occur during deletion
+                    Console.WriteLine($"⚠️ Could not delete root directory: {directoryPath}. {ex.Message}");
+                }
+
+               
+                await Task.CompletedTask;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"⚠️ Could not delete root directory: {directoryPath}. {ex.Message}");
+                // Catch any unexpected exceptions and rethrow after logging
+                Console.WriteLine($"❌ General error cleaning directory: {directoryPath}. {ex.Message}");
+                throw;
             }
-
-            // Delete all subdirectories
-            // foreach (var dirPath in Directory.GetDirectories(directoryPath))
-            // {
-            //     try
-            //     {
-            //         Directory.Delete(dirPath, recursive: true);
-            //         Console.WriteLine($"🗑️ Deleted subdirectory: {dirPath}");
-            //     }
-            //     catch (IOException ex)
-            //     {
-            //         Console.WriteLine($"❌ Could not delete directory (locked?): {dirPath}. {ex.Message}");
-            //     }
-            //     catch (UnauthorizedAccessException ex)
-            //     {
-            //         Console.WriteLine($"🚫 Permission denied for directory: {dirPath}. {ex.Message}");
-            //     }
-            // }
-            Console.WriteLine($"Cleaner Running ::");
-            await Task.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ General error cleaning directory: {directoryPath}. {ex.Message}");
-            throw;
         }
     }
 }

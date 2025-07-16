@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
 using VideoTranscoder.VideoTranscoder.Domain.DatabaseContext;
 using VideoTranscoder.VideoTranscoder.Domain.Entities;
@@ -15,9 +14,11 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Persistance
             _dbcontext = context;
         }
 
+        /// <summary>
+        /// Saves a new encoding profile or updates an existing one based on its ID.
+        /// </summary>
         public async Task SaveAsync(EncodingProfile data)
         {
-            // Add or update the EncodingProfile
             var existing = await _dbcontext.EncodingProfiles.FindAsync(data.Id);
             if (existing == null)
             {
@@ -31,10 +32,17 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Persistance
             await _dbcontext.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Retrieves a single encoding profile by its ID.
+        /// </summary>
         public async Task<EncodingProfile?> GetByIdAsync(int id)
         {
             return await _dbcontext.EncodingProfiles.FindAsync(id);
         }
+
+        /// <summary>
+        /// Retrieves a paginated list of encoding profiles, ordered by creation date (descending).
+        /// </summary>
         public async Task<List<EncodingProfile>> GetAllAsync(int pageNumber, int pageSize)
         {
             return await _dbcontext.EncodingProfiles
@@ -43,11 +51,19 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Persistance
                 .Take(pageSize)
                 .ToListAsync();
         }
+
+        /// <summary>
+        /// Returns the total number of encoding profiles in the database.
+        /// </summary>
         public async Task<int> GetTotalCountAsync()
         {
             return await _dbcontext.EncodingProfiles.CountAsync();
         }
 
+        /// <summary>
+        /// Retrieves all encoding profiles with a height less than or equal to the specified max height.
+        /// Ordered by height (descending), then width (descending).
+        /// </summary>
         public async Task<List<EncodingProfile>> GetProfilesUpToHeightAsync(int maxHeight)
         {
             return await _dbcontext.EncodingProfiles

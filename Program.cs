@@ -42,15 +42,15 @@ builder.Services.AddSingleton(provider =>
     );
 });
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
-);
 // builder.Services.AddDbContext<AppDbContext>(options =>
-//     options.UseMySql(
-//         configuration.GetConnectionString("DefaultConnection"),
-//         ServerVersion.AutoDetect(configuration.GetConnectionString("DefaultConnection"))
-//     )
+//     options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
 // );
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseMySql(
+        configuration.GetConnectionString("DefaultConnection"),
+        ServerVersion.AutoDetect(configuration.GetConnectionString("DefaultConnection"))
+    )
+);
 
 #endregion
 
@@ -119,6 +119,8 @@ builder.Services.AddAutoMapper(cfg => {
     cfg.AddProfile<ThumbnailMapper>();
 });
 builder.Services.AddScoped<FFmpegService>();
+builder.Services.AddScoped<TranscodeCompletionService>();
+
 builder.Services.AddScoped<LocalCleanerService>();
 builder.Services.AddHostedService<TranscodingWorker>();
 builder.Services.AddScoped<ITranscodingService, TranscodingService>();
@@ -132,8 +134,9 @@ builder.Services.AddScoped<IEncodingProfileService, EncodingProfileService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IThumbnailService, ThumbnailService>();
-builder.Services.AddScoped<IEncryptionService, CencEncryptionService>();
+builder.Services.AddScoped<IHashingService, SHAHashingService>();
 builder.Services.AddScoped<ICDNService, AzureCDNService>();
+
 
 
 

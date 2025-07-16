@@ -12,6 +12,5 @@ namespace VideoTranscoder.VideoTranscoder.Application.Interfaces
         Task<List<ThumbnailDto>> GetAllThumbnailsAsync(int fileId);
         Task SetDefaultThumbnailAsync(int thumbnailId, int fileId);
         Task<int> CountThumbnailsForFileAsync(int fileId);
-        Task<string> GenerateDefaultThumbnailAsync(string outputFileName, int userId, int videoId);
     }
 }

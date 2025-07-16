@@ -12,12 +12,14 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
     {
         private readonly ICloudStorageService _cloudStorageService;
 
-
         public CloudStorageController(ICloudStorageService cloudStorageService)
         {
             _cloudStorageService = cloudStorageService;
         }
 
+        /// <summary>
+        /// Generates a SAS URL for the given file name to allow secure access.
+        /// </summary>
         [HttpGet("sas-url")]
         public async Task<IActionResult> GetSasUrl([FromQuery] string fileName)
         {
@@ -26,7 +28,5 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
 
             return Ok(sasUrl);
         }
-
     }
-
 }

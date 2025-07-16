@@ -11,35 +11,42 @@ using VideoTranscoder.VideoTranscoder.Domain.Entities;
 
 namespace VideoTranscoder.VideoTranscoder.Application.Services
 {
-
-
     public class AuthService : IAuthService
     {
         private readonly AppDbContext _context;
         private readonly JwtService _jwtService;
+        private readonly IHashingService _hashingService;
 
-        public AuthService(AppDbContext context, JwtService jwtService)
+
+        // Constructor injecting DbContext and JWT service
+        public AuthService(AppDbContext context, JwtService jwtService, IHashingService hashingService)
         {
             _context = context;
             _jwtService = jwtService;
+            _hashingService = hashingService;
         }
 
+        // Handles user registration
         public async Task<AuthResponseDto> SignUpAsync(SignUpDto dto)
         {
+            // Check if user with given email already exists
             if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
                 throw new Exception("User already exists");
 
+            // Create a new user with hashed password and default role
             var user = new User
             {
                 Username = dto.Username,
                 Email = dto.Email,
-                PasswordHash = HashPassword(dto.Password),
+                PasswordHash = _hashingService.HashPassword(dto.Password),
                 Role = UserRole.User 
             };
 
+            // Save new user to database
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
+            // Return response with JWT token
             return new AuthResponseDto
             {
                 Token = _jwtService.GenerateToken(user),
@@ -48,12 +55,17 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
             };
         }
 
+        // Handles user login
         public async Task<AuthResponseDto> LoginAsync(LoginDto dto)
         {
+            // Find user by email
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
-            if (user == null || user.PasswordHash != HashPassword(dto.Password))
+
+            // Check if user exists and password is correct
+            if (user == null || user.PasswordHash != _hashingService.HashPassword(dto.Password))
                 throw new Exception("Invalid credentials");
 
+            // Return response with JWT token
             return new AuthResponseDto
             {
                 Token = _jwtService.GenerateToken(user),
@@ -62,13 +74,9 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
             };
         }
 
-        private static string HashPassword(string password)
-        {
-            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
-            return Convert.ToBase64String(bytes);
-        }
-
-          public int GetCurrentUserId(ClaimsPrincipal user)
+      
+        // Extracts and returns the current user's ID from JWT claims
+        public int GetCurrentUserId(ClaimsPrincipal user)
         {
             var userIdClaim = user.FindFirst(JwtRegisteredClaimNames.Sub)
                             ?? user.FindFirst(ClaimTypes.NameIdentifier); // fallback

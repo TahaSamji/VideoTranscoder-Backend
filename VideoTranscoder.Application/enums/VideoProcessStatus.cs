@@ -4,7 +4,8 @@ namespace VideoTranscoder.VideoTranscoder.Application.enums
     {
         Merged,
         Queued,
-        Transcoding,
-        Completed
+        InProgress,
+        Completed,
+        Failed
     }
 }

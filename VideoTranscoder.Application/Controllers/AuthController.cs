@@ -1,12 +1,9 @@
-
-
 using Microsoft.AspNetCore.Mvc;
 using VideoTranscoder.VideoTranscoder.Application.DTOs;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
 
 namespace VideoTranscoder.VideoTranscoder.Application.Controllers
 {
-
     [ApiController]
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
@@ -18,6 +15,9 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
             _authService = authService;
         }
 
+        /// <summary>
+        /// Registers a new user with the provided signup details.
+        /// </summary>
         [HttpPost("signup")]
         public async Task<IActionResult> SignUp(SignUpDto dto)
         {
@@ -25,6 +25,9 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Logs in a user with the provided credentials.
+        /// </summary>
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginDto dto)
         {
@@ -32,5 +35,4 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
             return Ok(result);
         }
     }
-
 }

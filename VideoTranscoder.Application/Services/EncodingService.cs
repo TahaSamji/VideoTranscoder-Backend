@@ -1,4 +1,3 @@
-
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
 using VideoTranscoder.VideoTranscoder.Domain.Entities;
 
@@ -8,15 +7,19 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
     {
         private readonly IEncodingProfileRepository _repository;
 
+        // Inject the encoding profile repository
         public EncodingProfileService(IEncodingProfileRepository repository)
         {
             _repository = repository;
         }
 
+        // Creates a new encoding profile after parsing resolution
         public async Task<EncodingProfile> CreateProfileAsync(EncodingProfile profile)
         {
-            // Extract width and height from "1920x1080" format
+            // Extract width and height from resolution string (e.g., "1920x1080")
             var resolutionParts = profile.Resolution.Split('x');
+
+            // Validate the format and parse width and height
             if (resolutionParts.Length != 2 ||
                 !int.TryParse(resolutionParts[0], out int width) ||
                 !int.TryParse(resolutionParts[1], out int height))
@@ -24,6 +27,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 throw new ArgumentException("❌ Invalid resolution format. Expected format: 'WIDTHxHEIGHT'");
             }
 
+            // Create a new encoding profile entity with parsed dimensions
             var entity = new EncodingProfile
             {
                 Name = profile.Name,
@@ -36,14 +40,19 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 Height = height
             };
 
+            // Save the new profile to the database
             await _repository.SaveAsync(entity);
+
             return entity;
         }
+
+        // Retrieves paginated list of encoding profiles along with total count
         public async Task<(List<EncodingProfile> Profiles, int TotalCount)> GetAllProfilesAsync(int pageNumber, int pageSize)
         {
-            var profiles = await _repository.GetAllAsync(pageNumber, pageSize);
-            var totalCount = await _repository.GetTotalCountAsync();
-            return (profiles, totalCount);
+            var profiles = await _repository.GetAllAsync(pageNumber, pageSize); // Fetch paginated profiles
+            var totalCount = await _repository.GetTotalCountAsync();            // Fetch total profile count
+
+            return (profiles, totalCount); // Return both in a tuple
         }
     }
 }

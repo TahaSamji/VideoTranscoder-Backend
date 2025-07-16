@@ -1,11 +1,10 @@
 using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-
-
 using VideoTranscoder.VideoTranscoder.Application.DTOs;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
 using VideoTranscoder.VideoTranscoder.Domain.Entities;
+
 namespace VideoTranscoder.VideoTranscoder.Application.Controllers
 {
     [ApiController]
@@ -15,7 +14,6 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
     {
         private readonly IVideoService _videoService;
         private readonly IAuthService _authService;
-
         private readonly IThumbnailService _thumbnailService;
 
         public VideoController(IVideoService videoService, IAuthService authService, IThumbnailService thumbnailService)
@@ -25,13 +23,16 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
             _thumbnailService = thumbnailService;
         }
 
+        /// <summary>
+        /// Completes video merge process and triggers thumbnail generation.
+        /// </summary>
         [HttpPost("mergeComplete")]
         public async Task<IActionResult> MergeCompleteAndRequestThumbnailUrl([FromBody] MergeRequestDto request)
         {
             int userId = _authService.GetCurrentUserId(User);
 
             await _videoService.StoreFileAndGenerateThumbnailsAsync(
-            request,
+                request,
                 userId
             );
 
@@ -40,6 +41,10 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
                 message = "🎬 Video successfully uploaded and sent for processing."
             });
         }
+
+        /// <summary>
+        /// Gets all uploaded videos for the currently authenticated user with pagination.
+        /// </summary>
         [HttpGet("my-uploads")]
         public async Task<IActionResult> GetMyUploads([FromQuery] int page = 1, [FromQuery] int pageSize = 6)
         {
@@ -50,6 +55,9 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
             return Ok(pagedVideos);
         }
 
+        /// <summary>
+        /// Gets all completed video renditions for a given file ID.
+        /// </summary>
         [HttpGet("get-video-renditions")]
         public async Task<IActionResult> GetRenditions([FromQuery] int fileId)
         {
@@ -59,6 +67,10 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
 
             return Ok(renditions);
         }
+
+        /// <summary>
+        /// Gets all thumbnails associated with a specific video file ID.
+        /// </summary>
         [HttpGet("get-all-video-thumbnails")]
         public async Task<IActionResult> GetAllThumbnails([FromQuery] int fileId)
         {
@@ -66,11 +78,13 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
             return Ok(thumbnails);
         }
 
+        /// <summary>
+        /// Sets a thumbnail as the default for a specific video file.
+        /// </summary>
         [HttpPost("set-default-thumbnail")]
         public async Task<IActionResult> SetDefaultThumbnail(
-
-       [FromQuery] int thumbnailId,
-       [FromQuery] int fileId)
+            [FromQuery] int thumbnailId,
+            [FromQuery] int fileId)
         {
             try
             {
@@ -82,12 +96,5 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
-
-
     }
-
-
-
-
 }
-
