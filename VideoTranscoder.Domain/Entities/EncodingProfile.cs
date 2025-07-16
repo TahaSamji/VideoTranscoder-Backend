@@ -5,9 +5,9 @@ using System.Text.Json.Serialization;
 
 namespace VideoTranscoder.VideoTranscoder.Domain.Entities
 {
-    public class EncodingProfile
-    {
-      [Key]
+  public class EncodingProfile
+  {
+    [Key]
     public int Id { get; set; }
 
     [JsonPropertyName("name")]
@@ -22,10 +22,13 @@ namespace VideoTranscoder.VideoTranscoder.Domain.Entities
     [JsonPropertyName("bitrate")]
     public required string Bitrate { get; set; }
 
+    public  int Width { get; set; }
+    public  int Height { get; set; }
+
     [JsonPropertyName("format_type")]
     public required string FormatType { get; set; }
 
     [JsonPropertyName("created_at")]
     public DateTime CreatedAt { get; set; }
-    }
+  }
 }

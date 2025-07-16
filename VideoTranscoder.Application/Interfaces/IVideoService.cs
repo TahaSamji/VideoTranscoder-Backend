@@ -11,6 +11,6 @@ namespace VideoTranscoder.VideoTranscoder.Application.Interfaces
     {
         Task<List<VideoMetaData>> GetAllVideosByUserIdAsync(int userId, int page, int pageSize);
         Task<List<VideoRenditionDto>> GetVideoRenditionsByFileIdAsync(int fileId);
-        Task StoreFileAndGenerateThumbnailsAsync(int totalChunks, string outputFileName, int userId, long fileSize, int encodingId);
+        Task StoreFileAndGenerateThumbnailsAsync(MergeRequestDto request, int userId);
     }
 }

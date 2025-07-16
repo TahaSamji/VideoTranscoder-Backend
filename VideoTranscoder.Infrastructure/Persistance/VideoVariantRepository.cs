@@ -22,9 +22,7 @@ public class VideoVariantRepository : IVideoVariantRepository
     public async Task<List<VideoVariant>> GetVariantsByFileIdIfCompletedAsync(int fileId)
     {
         return await _dbContext.VideoVariants
-            .Include(v => v.TranscodingJob)
-            .Where(v => v.TranscodingJob.VideoFileId == fileId &&
-                        v.TranscodingJob.Status == "Completed")
+            .Where(v => v.VideoFileId == fileId)
             .ToListAsync();
     }
 

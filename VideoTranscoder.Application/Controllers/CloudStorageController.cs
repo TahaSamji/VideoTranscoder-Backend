@@ -27,12 +27,6 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
             return Ok(sasUrl);
         }
 
-        // [HttpPost("merge")]
-        // public async Task<IActionResult> MergeChunks([FromBody] MergeRequestDto dto)
-        // {
-        //     await _azureService.MergeChunksAsync(dto.FileId, dto.TotalChunks, dto.OutputFileName,dto.EncodingId);
-        // return Ok(new { message = " Merge completed." });
-        // }
     }
 
 }

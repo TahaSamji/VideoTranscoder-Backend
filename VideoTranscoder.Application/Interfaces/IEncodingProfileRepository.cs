@@ -8,6 +8,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Interfaces
         Task<EncodingProfile?> GetByIdAsync(int id);
         Task<List<EncodingProfile>> GetAllAsync(int pageNumber, int pageSize);
         Task<int> GetTotalCountAsync();
+        Task<List<EncodingProfile>> GetProfilesUpToHeightAsync(int maxHeight);
     }
 
 }

@@ -17,17 +17,15 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
         private readonly BlobServiceClient _blobServiceClient;
         private readonly IUserService _userService;
         private readonly ILogger<AzureBlobStorageService> _logger;
-        private readonly LocalCleanerService _cleanerService;
 
 
 
-        public AzureBlobStorageService( LocalCleanerService clearService, ILogger<AzureBlobStorageService> logger, IOptions<AzureOptions> azureOptions, BlobServiceClient blobServiceClient, IUserService userService)
+        public AzureBlobStorageService( ILogger<AzureBlobStorageService> logger, IOptions<AzureOptions> azureOptions, BlobServiceClient blobServiceClient, IUserService userService)
         {
             _azureOptions = azureOptions.Value;
             _blobServiceClient = blobServiceClient;
             _userService = userService;
             _logger = logger;
-            _cleanerService = clearService;
         }
 
         public async Task<string> GenerateSasUriAsync(string fileName)
@@ -131,67 +129,7 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
         }
 
 
-        // public async Task<string> UploadTranscodedOutputAsync(string tempOutputDir, string fileName, int fileId, int userId, int encodingProfileId)
-        // {
-        //     string containerName = _azureOptions.ContainerName;
-        //     var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
-
-        //     string[] formats = ["hls", "dash"];
-        //     string? firstUploadedBlobPath = null;
-
-        //     foreach (var format in formats)
-        //     {
-        //         var subDir = Path.Combine(tempOutputDir, format);
-        //         if (!Directory.Exists(subDir))
-        //         {
-        //             Console.WriteLine($"⚠️ Directory not found: {subDir}");
-        //             continue;
-        //         }
-
-        //         var files = Directory.GetFiles(subDir, "*", SearchOption.AllDirectories);
-        //         string transcodedPath = $"{userId}/{fileName}_{fileId}/{encodingProfileId}";
-
-        //         foreach (var localFilePath in files)
-        //         {
-        //             var relativePath = Path.GetRelativePath(tempOutputDir, localFilePath).Replace("\\", "/");
-        //             string blobPath = $"{userId}/{fileName}_{fileId}/{encodingProfileId}/{relativePath}";
-
-
-        //             try
-        //             {
-        //                 using var fileStream = File.OpenRead(localFilePath);
-        //                 var blobClient = containerClient.GetBlobClient(blobPath);
-
-        //                 await blobClient.UploadAsync(fileStream, overwrite: true);
-
-        //                 var contentType = Path.GetExtension(blobPath).ToLower() switch
-        //                 {
-        //                     ".m3u8" => "application/vnd.apple.mpegurl",
-        //                     ".mpd" => "application/dash+xml",
-        //                     ".m4s" => "video/iso.segment",
-        //                     ".mp4" => "video/mp4",
-        //                     _ => "application/octet-stream"
-        //                 };
-
-        //                 await blobClient.SetHttpHeadersAsync(new BlobHttpHeaders { ContentType = contentType });
-        //                 Console.WriteLine($"✅ Uploaded: {blobPath}");
-
-        //                 // Store first uploaded blob path
-        //                 firstUploadedBlobPath ??= transcodedPath;
-        //             }
-        //             catch (Exception ex)
-        //             {
-        //                 Console.WriteLine($"❌ Error uploading {blobPath}: {ex.Message}");
-        //                 throw;
-        //             }
-        //         }
-        //     }
-
-        //     // Ensure something is returned
-        //     return firstUploadedBlobPath ?? throw new Exception("❌ No files uploaded.");
-        // }
-
-        public async Task<string> UploadTranscodedOutputAsync(string tempOutputDir, string fileName, int fileId, int userId, int encodingProfileId)
+            public async Task<string> UploadTranscodedOutputAsync(string tempOutputDir, string fileName, int fileId, int userId, int encodingProfileId)
         {
             try
             {
@@ -270,50 +208,6 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
             }
         }
 
-
-
-
-        // public async Task<string> DownloadVideoToLocalAsync(string filename, int userId, int fileId)
-        // {
-        //     try
-        //     {
-
-        //         string currentDir = Directory.GetCurrentDirectory();
-        //         string inputDir = Path.Combine(currentDir, "input", $"{userId}", $"{fileId}", "videos");
-        //         Directory.CreateDirectory(inputDir); // Ensure folder exists
-
-        //         string localFilePath = Path.Combine(inputDir, filename);
-        //         FileUsageTracker.Increment(localFilePath);
-
-        //         // ✅ Check if file already exists
-        //         if (File.Exists(localFilePath))
-        //         {
-        //             _logger.LogInformation("📁 File already exists locally: {Path}", localFilePath);
-        //             return localFilePath;
-        //         }
-
-        //         _logger.LogInformation("⬇️ Downloading video: {Filename} for user {UserId}, file {FileId}", filename, userId, fileId);
-
-        //         // 1. Generate SAS URL for secure read access
-        //         var sasUrl = await GenerateSasUriAsync(filename);
-
-        //         // 2. Download using HttpClient
-        //         using var httpClient = new HttpClient();
-        //         using var response = await httpClient.GetAsync(sasUrl, HttpCompletionOption.ResponseHeadersRead);
-        //         response.EnsureSuccessStatusCode();
-
-        //         await using var fs = new FileStream(localFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
-        //         await response.Content.CopyToAsync(fs);
-
-        //         _logger.LogInformation("✅ Downloaded video to: {Path}", localFilePath);
-        //         return localFilePath;
-        //     }
-        //     catch (Exception ex)
-        //     {
-        //         _logger.LogError(ex, "❌ Error downloading video: {Filename} for user {UserId}, file {FileId}", filename, userId, fileId);
-        //         throw;
-        //     }
-        // }
 
         public async Task<string> DownloadVideoToLocalAsync(string filename, int userId, int fileId)
         {

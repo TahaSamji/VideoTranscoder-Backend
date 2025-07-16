@@ -48,5 +48,13 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Persistance
             return await _dbcontext.EncodingProfiles.CountAsync();
         }
 
+        public async Task<List<EncodingProfile>> GetProfilesUpToHeightAsync(int maxHeight)
+        {
+            return await _dbcontext.EncodingProfiles
+                .Where(p => p.Height <= maxHeight)
+                .OrderByDescending(p => p.Height)
+                .ThenByDescending(p => p.Width)
+                .ToListAsync();
+        }
     }
 }

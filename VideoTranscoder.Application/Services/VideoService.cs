@@ -2,7 +2,10 @@
 
 
 
+using Google.Protobuf.WellKnownTypes;
 using Microsoft.Extensions.Options;
+using Org.BouncyCastle.Ocsp;
+using Org.BouncyCastle.Tsp;
 using VideoTranscoder.VideoTranscoder.Application.Configurations;
 using VideoTranscoder.VideoTranscoder.Application.DTOs;
 using VideoTranscoder.VideoTranscoder.Application.enums;
@@ -20,7 +23,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
         private readonly IMessageQueueService _queuePublisher;
         private readonly IConfiguration _configuration;
         private readonly FFmpegService _ffmpegService;
-        private readonly IThumbnailRepository _thumbnailRepository;
+        private readonly IEncodingProfileRepository _encodingProfileRepository;
         private readonly IVideoVariantRepository _videoVariantRepository;
         private readonly AzureOptions _azureOptions;
 
@@ -28,7 +31,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
 
 
 
-        public VideoService(ICloudStorageService azureService, IThumbnailService thumbnailService, ILogger<VideoService> logger, IVideoVariantRepository videoVariantRepository, IVideoRepository videoRepository, IMessageQueueService queuePublisher, FFmpegService fFmpegService, IThumbnailRepository thumbnailRepository, IOptions<AzureOptions> azureOptions,
+        public VideoService(IEncodingProfileRepository encodingProfileRepository, ICloudStorageService azureService, IThumbnailService thumbnailService, ILogger<VideoService> logger, IVideoVariantRepository videoVariantRepository, IVideoRepository videoRepository, IMessageQueueService queuePublisher, FFmpegService fFmpegService, IOptions<AzureOptions> azureOptions,
         IConfiguration configuration)
         {
             _cloudStorageService = azureService;
@@ -36,7 +39,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
             _configuration = configuration;
             _queuePublisher = queuePublisher;
             _ffmpegService = fFmpegService;
-            _thumbnailRepository = thumbnailRepository;
+            _encodingProfileRepository = encodingProfileRepository;
             _azureOptions = azureOptions.Value;
             _videoVariantRepository = videoVariantRepository;
             _logger = logger;
@@ -85,34 +88,40 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 throw;
             }
         }
-        public async Task StoreFileAndGenerateThumbnailsAsync(int totalChunks, string outputFileName, int userId, long fileSize, int encodingId)
+        public async Task StoreFileAndGenerateThumbnailsAsync(MergeRequestDto request, int userId)
         {
             try
             {
-                _logger.LogInformation("📥 Processing file upload for user {UserId}, file '{FileName}', size {FileSize}", userId, outputFileName, fileSize);
+                _logger.LogInformation("📥 Processing file upload for user {UserId}, file '{FileName}', size {FileSize}", userId, request.OutputFileName, request.FileSize);
 
                 // Check if video already exists
-                var existingVideo = await _videoRepository.FindByNameAndSizeAsync(outputFileName, fileSize, userId);
+                var existingVideo = await _videoRepository.FindByNameAndSizeAsync(request.OutputFileName, request.FileSize, userId);
                 if (existingVideo != null)
                 {
-                    _logger.LogWarning("⚠️ Video already exists for user {UserId}, file '{FileName}', size {FileSize}", userId, outputFileName, fileSize);
+                    _logger.LogWarning("⚠️ Video already exists for user {UserId}, file '{FileName}', size {FileSize}", userId, request.OutputFileName, request.FileSize);
                     throw new InvalidOperationException("Video already exists.");
                 }
 
                 // Prepare blob path
                 string containerName = _azureOptions.ContainerName;
-                var blobPath = $"{containerName}/{userId}/{outputFileName}";
+                var blobPath = $"{containerName}/{userId}/{request.OutputFileName}";
 
                 // Create new video metadata entry
                 var videoMetaData = new VideoMetaData
                 {
                     UserId = userId,
-                    OriginalFilename = outputFileName,
+                    OriginalFilename = request.OutputFileName,
+                    Resolution = request.Resolution,
                     BlobPath = blobPath,
                     Status = VideoProcessStatus.Merged.ToString(),
-                    Size = fileSize,
+                    Size = request.FileSize,
+                    TotalChunks = request.TotalChunks,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
+                    Duration = request.Duration,
+                    MIMEType = request.MIMEType,
+                    Height = request.Height,
+                    Width = request.Width,
                     defaultThumbnailUrl = string.Empty
                 };
 
@@ -121,25 +130,36 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
 
                 // Download video locally to generate thumbnails
                 _logger.LogInformation("⬇️ Downloading video locally , FileId {FileId}", videoMetaData.Id);
-                string inputFilePath = await _cloudStorageService.DownloadVideoToLocalAsync(outputFileName, userId, videoMetaData.Id);
+                string inputFilePath = await _cloudStorageService.DownloadVideoToLocalAsync(request.OutputFileName, userId, videoMetaData.Id);
                 // Send transcode request
-                var message = new TranscodeRequestMessage
+                // ✅ Fetch all matching encoding profiles by height
+                var encodingProfiles = await _encodingProfileRepository.GetProfilesUpToHeightAsync(request.Height);
+
+                if (!encodingProfiles.Any())
+                {
+                    _logger.LogWarning("⚠️ No encoding profiles matched for height {Height}", request.Height);
+                    throw new InvalidOperationException("No valid encoding profiles found.");
+                }
+
+                // ✅ Prepare all messages
+                var messages = encodingProfiles.Select(profile => new TranscodeRequestMessage
                 {
                     FileId = videoMetaData.Id,
                     BlobPath = videoMetaData.BlobPath,
-                    EncodingProfileId = encodingId,
+                    EncodingProfileId = profile.Id,
                     LocalVideoPath = inputFilePath
-                
-                };
+                }).ToList();
 
+                // ✅ Send as batch
                 string queueName = _configuration["AzureServiceBus:TranscodeQueueName"]!;
-                _logger.LogInformation("📤 Sending transcode request to queue '{Queue}' for FileId {FileId}", queueName, videoMetaData.Id);
+                await _queuePublisher.SendBatchAsync(messages, queueName);
 
-                await _queuePublisher.SendMessageAsync(message, queueName);
-                _logger.LogInformation("✅ Transcode request sent successfully for FileId {FileId}, EncodingId {EncodingId}", videoMetaData.Id, encodingId);
+                _logger.LogInformation("✅ Sent {Count} transcode requests for FileId {FileId} to queue '{Queue}'", messages.Count, videoMetaData.Id, queueName);
+
+                // ✅ Generate and update thumbnail
                 // Generate and store thumbnails
                 _logger.LogInformation("🖼️ Generating thumbnails for FileId {FileId}", videoMetaData.Id);
-                var thumbnailUrl = await _thumbnailService.GenerateAndStoreThumbnailsAsync(outputFileName, userId, videoMetaData.Id, inputFilePath);
+                var thumbnailUrl = await _thumbnailService.GenerateAndStoreThumbnailsAsync(request.OutputFileName, userId, videoMetaData.Id, inputFilePath);
 
                 // Update thumbnail URL and status
                 await _videoRepository.UpdateThumbnailUrlAsync(videoMetaData.Id, thumbnailUrl);
@@ -148,12 +168,12 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
             }
             catch (InvalidOperationException ex)
             {
-                _logger.LogWarning(ex, "⚠️ Duplicate upload attempt for user {UserId}, file '{FileName}'", userId, outputFileName);
+                _logger.LogWarning(ex, "⚠️ Duplicate upload attempt for user {UserId}, file '{FileName}'", userId, request.OutputFileName);
                 throw; // Rethrow to let the caller handle it
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ Error in StoreFileAndReturnThumbnailUrlAsync for user {UserId}, file '{FileName}'", userId, outputFileName);
+                _logger.LogError(ex, "❌ Error in StoreFileAndReturnThumbnailUrlAsync for user {UserId}, file '{FileName}'", userId, request.OutputFileName);
                 throw;
             }
         }

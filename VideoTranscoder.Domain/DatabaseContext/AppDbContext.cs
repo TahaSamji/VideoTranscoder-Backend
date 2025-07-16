@@ -26,7 +26,7 @@ namespace VideoTranscoder.VideoTranscoder.Domain.DatabaseContext
            .HasOne(v => v.TranscodingJob)
            .WithMany()
            .HasForeignKey(v => v.TranscodingJobId)
-           .OnDelete(DeleteBehavior.Cascade);
+           .OnDelete(DeleteBehavior.Restrict);
 
 
             modelBuilder.Entity<TranscodingJob>()

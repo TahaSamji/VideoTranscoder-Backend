@@ -15,6 +15,15 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
 
         public async Task<EncodingProfile> CreateProfileAsync(EncodingProfile profile)
         {
+            // Extract width and height from "1920x1080" format
+            var resolutionParts = profile.Resolution.Split('x');
+            if (resolutionParts.Length != 2 ||
+                !int.TryParse(resolutionParts[0], out int width) ||
+                !int.TryParse(resolutionParts[1], out int height))
+            {
+                throw new ArgumentException("❌ Invalid resolution format. Expected format: 'WIDTHxHEIGHT'");
+            }
+
             var entity = new EncodingProfile
             {
                 Name = profile.Name,
@@ -22,7 +31,9 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 Resolution = profile.Resolution,
                 Bitrate = profile.Bitrate,
                 FormatType = profile.FormatType,
-                CreatedAt = profile.CreatedAt
+                CreatedAt = profile.CreatedAt,
+                Width = width,
+                Height = height
             };
 
             await _repository.SaveAsync(entity);

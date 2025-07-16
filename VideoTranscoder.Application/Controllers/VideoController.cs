@@ -31,11 +31,8 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
             int userId = _authService.GetCurrentUserId(User);
 
             await _videoService.StoreFileAndGenerateThumbnailsAsync(
-                request.TotalChunks,
-                request.OutputFileName,
-                userId,
-                request.FileSize,
-                request.EncodingId
+            request,
+                userId
             );
 
             return Ok(new

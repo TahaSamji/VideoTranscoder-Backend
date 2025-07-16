@@ -16,21 +16,6 @@ public class AzureCDNService : ICDNService
         _cdnBaseUrl = cdnOptions.Value.BaseUrl;
     }
 
-    // public async Task<string> GenerateSignedUrlAsync(string storagePath)
-    // {
-    //     // Step 1: Get the full SAS URL from blob (e.g., https://account.blob.core.windows.net/container/file.mp4?sv=...)
-    //     var fullBlobSasUrl = await _cloudStorageService.GenerateBlobSasUriAsync(storagePath);
-
-    //     var uri = new Uri(fullBlobSasUrl);
-
-    //     // Step 2: Extract the path and query string
-    //     var path = uri.AbsolutePath.TrimStart('/');  // "container/file.mp4"
-    //     var sasToken = uri.Query.TrimStart('?');     // "sv=2023-08-04&..."
-
-    //     // Step 3: Combine with CDN base URL
-    //     var cdnSignedUrl = $"{_cdnBaseUrl}/{path}?{sasToken}";
-    //     return cdnSignedUrl;
-    // }
     public async Task<string> GenerateSignedUrlAsync(string storagePath)
     {
         // Step 1: Generate a container-level SAS token (not for a single file)

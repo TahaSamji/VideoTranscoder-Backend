@@ -1,12 +1,26 @@
+using System.Text.Json.Serialization;
 
-namespace VideoTranscoder.VideoTranscoder.Application.DTOs
+public class MergeRequestDto
 {
-    public class MergeRequestDto
-    {
-        public int TotalChunks { get; set; }
-        public required string OutputFileName { get; set; }
-        public long FileSize { get; set; }
-        public int EncodingId { get; set; }
+    [JsonPropertyName("totalChunks")]
+    public int TotalChunks { get; set; }
 
-    }
+    [JsonPropertyName("outputFileName")]
+    public string OutputFileName { get; set; }
+
+    [JsonPropertyName("fileSize")]
+    public long FileSize { get; set; }
+    [JsonPropertyName("width")]
+    public required int Width { get; set; }
+    [JsonPropertyName("height")]  
+    public required int Height { get; set; }
+
+    [JsonPropertyName("duration")]
+    public int Duration { get; set; }
+
+    [JsonPropertyName("resolution")]
+    public string Resolution { get; set; }
+
+    [JsonPropertyName("mimeType")]
+    public string MIMEType { get; set; }
 }

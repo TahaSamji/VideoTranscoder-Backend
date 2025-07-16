@@ -42,15 +42,15 @@ builder.Services.AddSingleton(provider =>
     );
 });
 
-// builder.Services.AddDbContext<AppDbContext>(options =>
-//     options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
-// );
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseMySql(
-        configuration.GetConnectionString("DefaultConnection"),
-        ServerVersion.AutoDetect(configuration.GetConnectionString("DefaultConnection"))
-    )
+    options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
 );
+// builder.Services.AddDbContext<AppDbContext>(options =>
+//     options.UseMySql(
+//         configuration.GetConnectionString("DefaultConnection"),
+//         ServerVersion.AutoDetect(configuration.GetConnectionString("DefaultConnection"))
+//     )
+// );
 
 #endregion
 
@@ -104,9 +104,15 @@ builder.Services.AddSingleton(provider =>
 {
     var client = provider.GetRequiredService<ServiceBusClient>();
     var queueName = configuration["AzureServiceBus:TranscodeQueueName"];
-    return client.CreateProcessor(queueName, new ServiceBusProcessorOptions());
-});
 
+    var options = new ServiceBusProcessorOptions
+    {
+        MaxConcurrentCalls = 5, // 🔧 Increase this to control "worker" concurrency
+        AutoCompleteMessages = false // You manually complete messages in code
+    };
+
+    return client.CreateProcessor(queueName, options);
+});
 // 🔹 Transcoding Worker & Services
 // Register AutoMapper with configuration
 builder.Services.AddAutoMapper(cfg => {
