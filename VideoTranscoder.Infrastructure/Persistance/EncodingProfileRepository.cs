@@ -32,6 +32,17 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Persistance
             await _dbcontext.SaveChangesAsync();
         }
 
+        public async Task<bool> DeleteAsync(int id)
+        {
+            var existing = await _dbcontext.EncodingProfiles.FindAsync(id);
+            if (existing == null)
+                return false;
+
+            existing.IsActive = false;
+            await _dbcontext.SaveChangesAsync();
+            return true;
+        }
+
         /// <summary>
         /// Retrieves a single encoding profile by its ID.
         /// </summary>
@@ -46,11 +57,13 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Persistance
         public async Task<List<EncodingProfile>> GetAllAsync(int pageNumber, int pageSize)
         {
             return await _dbcontext.EncodingProfiles
+                .Where(e => e.IsActive) //  Filter only active ones
                 .OrderByDescending(e => e.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
         }
+
 
         /// <summary>
         /// Returns the total number of encoding profiles in the database.

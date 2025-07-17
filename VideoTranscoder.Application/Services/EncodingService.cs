@@ -46,6 +46,25 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
             return entity;
         }
 
+        public async Task<bool> DeleteProfileAsync(int id)
+        {
+            var existing = await _repository.GetByIdAsync(id);
+            if (existing == null)
+                return false;
+
+            await _repository.DeleteAsync(id);
+            return true;
+        }
+        public async Task<EncodingProfile?> UpdateProfileAsync(int id, EncodingProfile updatedProfile)
+        {
+            if (id != updatedProfile.Id)
+                return null;
+
+            await _repository.SaveAsync(updatedProfile);
+
+            return updatedProfile;
+        }
+
         // Retrieves paginated list of encoding profiles along with total count
         public async Task<(List<EncodingProfile> Profiles, int TotalCount)> GetAllProfilesAsync(int pageNumber, int pageSize)
         {

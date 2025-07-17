@@ -1,3 +1,4 @@
+using VideoTranscoder.VideoTranscoder.Application.enums;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
 
 namespace VideoTranscoder.VideoTranscoder.Worker.Services
@@ -10,17 +11,20 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
         private readonly IVideoVariantRepository _videoVariantRepository; // To interact with video variants
         private readonly LocalCleanerService _cleanerService; // Handles cleanup of local directories
         private readonly ITranscodingJobRepository _transcodingJobRepository; // Handles job metadata
+        private readonly IVideoRepository _videoRepository;
 
         public TranscodeCompletionService(
             LocalCleanerService cleanerService,
             ITranscodingJobRepository transcodingJobRepository,
             IVideoVariantRepository videoVariantRepository,
+            IVideoRepository videoRepository,
             ILogger<ThumbnailService> logger)
         {
             _logger = logger;
             _cleanerService = cleanerService;
             _videoVariantRepository = videoVariantRepository;
             _transcodingJobRepository = transcodingJobRepository;
+            _videoRepository = videoRepository;
         }
 
         /// <summary>
@@ -42,7 +46,8 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                     "✅ All {Count} transcoding jobs for FileId {FileId} are complete. Cleaning local input directory...",
                     completedJobCount, fileId
                 );
-
+                 // Update Video Status to Completed
+                await _videoRepository.UpdateStatusAsync(fileId, VideoProcessStatus.Completed.ToString());
                 // Get parent directory of the video file path (e.g., .../input/userId/fileId/videos)
                 string? parentDirectory = Directory.GetParent(inputFilePath)?.FullName;
 

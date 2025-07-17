@@ -1,7 +1,11 @@
 namespace VideoTranscoder.VideoTranscoder.Application.enums
 {
-    public enum UserRole
+
+    // User Roles 
+     public enum UserRole
     {
+
+    
         User,
         Admin,
     }

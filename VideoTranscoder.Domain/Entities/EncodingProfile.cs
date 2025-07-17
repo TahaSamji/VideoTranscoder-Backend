@@ -22,13 +22,15 @@ namespace VideoTranscoder.VideoTranscoder.Domain.Entities
     [JsonPropertyName("bitrate")]
     public required string Bitrate { get; set; }
 
-    public  int Width { get; set; }
-    public  int Height { get; set; }
+    public int Width { get; set; }
+    public int Height { get; set; }
 
     [JsonPropertyName("format_type")]
     public required string FormatType { get; set; }
 
     [JsonPropertyName("created_at")]
     public DateTime CreatedAt { get; set; }
+    
+     public bool IsActive { get; set; } = true;
   }
 }

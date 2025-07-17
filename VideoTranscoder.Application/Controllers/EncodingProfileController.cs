@@ -29,20 +29,31 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
             return Ok(result);
         }
 
-        /// <summary>
-        /// Retrieves all encoding profiles with pagination support.
-        /// </summary>
-        [HttpGet("getallEncodings")]
-        public async Task<IActionResult> GetAllEncodingProfiles([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        [HttpPut("update-encoding-profile/{id}")]
+        public async Task<IActionResult> UpdateEncodingProfile(int id, [FromBody] EncodingProfile updatedProfile)
         {
-            var (profiles, totalCount) = await _encodingProfileService.GetAllProfilesAsync(page, pageSize);
-            return Ok(new
-            {
-                items = profiles,
-                total = totalCount,
-                page,
-                pageSize
-            });
+            if (id != updatedProfile.Id)
+                return BadRequest("Encoding profile ID mismatch.");
+
+            var result = await _encodingProfileService.UpdateProfileAsync(id, updatedProfile);
+
+            if (result == null)
+                return NotFound($"Encoding profile with ID {id} not found.");
+
+            return Ok(result);
         }
+
+        [HttpDelete("delete-encoding-profile/{id}")]
+        public async Task<IActionResult> DeleteEncodingProfile(int id)
+        {
+            var deleted = await _encodingProfileService.DeleteProfileAsync(id);
+            if (!deleted)
+                return NotFound($"EncodingProfile with ID {id} not found.");
+
+            return Ok($"EncodingProfile with ID {id} has been deleted.");
+        }
+
+
+
     }
 }

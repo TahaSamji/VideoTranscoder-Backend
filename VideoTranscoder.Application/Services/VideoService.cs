@@ -138,7 +138,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 _logger.LogInformation("⬇️ Downloading video locally , FileId {FileId}", videoMetaData.Id);
                 string inputFilePath = await _cloudStorageService.DownloadVideoToLocalAsync(request.OutputFileName, userId, videoMetaData.Id);
                 // Send transcode request
-                // ✅ Fetch all matching encoding profiles by height
+                //  Fetch all matching encoding profiles by height
                 var encodingProfiles = await _encodingProfileRepository.GetProfilesUpToHeightAsync(request.Height);
 
                 if (!encodingProfiles.Any())
@@ -147,7 +147,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                     throw new InvalidOperationException("No valid encoding profiles found.");
                 }
 
-                // ✅ Prepare all messages
+                //  Prepare all messages
                 var messages = encodingProfiles.Select(profile => new TranscodeRequestMessage
                 {
                     FileId = videoMetaData.Id,
@@ -156,13 +156,13 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                     TotalRenditions = encodingProfiles.Count
                 }).ToList();
 
-                // ✅ Send as batch
+                //  Send as batch
                 string queueName = _configuration["AzureServiceBus:TranscodeQueueName"]!;
                 await _queuePublisher.SendBatchAsync(messages, queueName);
 
                 _logger.LogInformation("✅ Sent {Count} transcode requests for FileId {FileId} to queue '{Queue}'", messages.Count, videoMetaData.Id, queueName);
 
-                // ✅ Generate and update thumbnail
+                //  Generate and update thumbnail
                 // Generate and store thumbnails
                 _logger.LogInformation("🖼️ Generating thumbnails for FileId {FileId}", videoMetaData.Id);
                 var thumbnailUrl = await _thumbnailService.GenerateAndStoreThumbnailsAsync(request.OutputFileName, userId, videoMetaData.Id, inputFilePath);

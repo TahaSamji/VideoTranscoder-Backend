@@ -14,13 +14,15 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
     {
         private readonly IVideoService _videoService;
         private readonly IAuthService _authService;
+         private readonly IEncodingProfileService _encodingProfileService;
         private readonly IThumbnailService _thumbnailService;
 
-        public VideoController(IVideoService videoService, IAuthService authService, IThumbnailService thumbnailService)
+        public VideoController(IVideoService videoService, IAuthService authService, IThumbnailService thumbnailService, IEncodingProfileService encodingProfileService)
         {
             _videoService = videoService;
             _authService = authService;
             _thumbnailService = thumbnailService;
+            _encodingProfileService = encodingProfileService;
         }
 
         /// <summary>
@@ -96,5 +98,23 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
                 return BadRequest(new { error = ex.Message });
             }
         }
+
+         /// <summary>
+        /// Retrieves all encoding profiles with pagination support.
+        /// </summary>
+        [HttpGet("getallEncodings")]
+        public async Task<IActionResult> GetAllEncodingProfiles([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            var (profiles, totalCount) = await _encodingProfileService.GetAllProfilesAsync(page, pageSize);
+            return Ok(new
+            {
+                items = profiles,
+                total = totalCount,
+                page,
+                pageSize
+            });
+        }
+
+        
     }
 }
