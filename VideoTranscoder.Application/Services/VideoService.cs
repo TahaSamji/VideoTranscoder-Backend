@@ -49,9 +49,15 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
 
         public async Task<List<VideoMetaData>> GetAllVideosByUserIdAsync(int userId, int page, int pageSize)
         {
-            return await _videoRepository.GetAllByUserIdAsync(userId, page, pageSize);
-        }
+            // Fetch videos uploaded by the user
+            var videos = await _videoRepository.GetAllByUserIdAsync(userId, page, pageSize);
 
+            // Throw NotFoundException if no videos are found
+            if (videos == null || !videos.Any())
+                throw new NotFoundException($"No videos found for userId: {userId}");
+
+            return videos;
+        }
         public async Task<List<VideoRenditionDto>> GetVideoRenditionsByFileIdAsync(int fileId)
         {
             try
@@ -66,7 +72,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 if (variants == null || !variants.Any())
                 {
                     _logger.LogWarning("⚠️ No completed variants found for fileId: {FileId}", fileId);
-                    return new List<VideoRenditionDto>();
+                    throw new NotFoundException($"No completed video variants found for fileId: {fileId}");
                 }
 
                 // Convert variants into DTOs for response
@@ -105,7 +111,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 if (existingVideo != null)
                 {
                     _logger.LogWarning("⚠️ Video already exists for user {UserId}, file '{FileName}', size {FileSize}", userId, request.OutputFileName, request.FileSize);
-                    throw new InvalidOperationException("Video already exists.");
+                    throw new VideoAlreadyExistsException("Video already exists.");
                 }
 
                 // Prepare blob path
@@ -139,12 +145,12 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 string inputFilePath = await _cloudStorageService.DownloadVideoToLocalAsync(request.OutputFileName, userId, videoMetaData.Id);
                 // Send transcode request
                 //  Fetch all matching encoding profiles by height
-                var encodingProfiles = await _encodingProfileRepository.GetProfilesUpToHeightAsync(request.Height);
+                var encodingProfiles = await _encodingProfileRepository.GetProfilesUpToHeightAndBrowserTypeAsync(request.Height,request.BrowserType);
 
                 if (!encodingProfiles.Any())
                 {
                     _logger.LogWarning("⚠️ No encoding profiles matched for height {Height}", request.Height);
-                    throw new InvalidOperationException("No valid encoding profiles found.");
+                    throw new NotFoundException("No valid encoding profiles found.");
                 }
 
                 //  Prepare all messages
@@ -172,7 +178,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 await _videoRepository.UpdateStatusAsync(videoMetaData.Id, VideoProcessStatus.Queued.ToString());
 
             }
-            catch (InvalidOperationException ex)
+            catch (VideoAlreadyExistsException ex)
             {
                 _logger.LogWarning(ex, "⚠️ Duplicate upload attempt for user {UserId}, file '{FileName}'", userId, request.OutputFileName);
                 throw; // Rethrow to let the caller handle it

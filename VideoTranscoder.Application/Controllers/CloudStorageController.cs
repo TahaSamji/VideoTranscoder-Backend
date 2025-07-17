@@ -20,13 +20,19 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
         /// <summary>
         /// Generates a SAS URL for the given file name to allow secure access.
         /// </summary>
-        [HttpGet("sas-url")]
+      [HttpGet("sas-url")]
         public async Task<IActionResult> GetSasUrl([FromQuery] string fileName)
         {
-            var sasUrl = await _cloudStorageService.GenerateSasUriAsync(fileName);
-            Console.WriteLine(sasUrl);
-
-            return Ok(sasUrl);
+            try
+            {
+                var sasUrl = await _cloudStorageService.GenerateSasUriAsync(fileName);
+                return Ok(sasUrl);
+            }
+            catch (Exception ex)
+            {
+                // Generic fallback
+                return StatusCode(500, new { error = ex.Message });
+            }
         }
     }
 }

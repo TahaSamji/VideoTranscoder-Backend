@@ -43,7 +43,8 @@ namespace VideoTranscoder.VideoTranscoder.Application.Configurations
                         Height = 2160,
                         Bitrate = "18000k",
                         CreatedAt = DateTime.UtcNow,
-                        FormatType = "hls"
+                        FormatType = "hls",
+                        BrowserType  = "Chrome"
                     };
 
                     var encoding2 = new EncodingProfile
@@ -55,7 +56,8 @@ namespace VideoTranscoder.VideoTranscoder.Application.Configurations
                         Height = 1440,
                         Bitrate = "8000k",
                         CreatedAt = DateTime.UtcNow,
-                        FormatType = "hls"
+                        FormatType = "hls",
+                        BrowserType  = "Chrome"
                     };
 
                     var encoding3 = new EncodingProfile
@@ -67,7 +69,8 @@ namespace VideoTranscoder.VideoTranscoder.Application.Configurations
                         Height = 1080,
                         Bitrate = "5000k",
                         CreatedAt = DateTime.UtcNow,
-                        FormatType = "hls"
+                        FormatType = "hls",
+                        BrowserType  = "Chrome"
                     };
 
                     var encoding4 = new EncodingProfile
@@ -79,7 +82,8 @@ namespace VideoTranscoder.VideoTranscoder.Application.Configurations
                         Height = 720,
                         Bitrate = "3000k",
                         CreatedAt = DateTime.UtcNow,
-                        FormatType = "hls"
+                        FormatType = "hls",
+                        BrowserType  = "Chrome"
                     };
 
                     var encoding5 = new EncodingProfile
@@ -91,7 +95,8 @@ namespace VideoTranscoder.VideoTranscoder.Application.Configurations
                         Height = 540,
                         Bitrate = "2200k",
                         CreatedAt = DateTime.UtcNow,
-                        FormatType = "hls"
+                        FormatType = "hls",
+                        BrowserType  = "Chrome"
                     };
 
                     var encoding6 = new EncodingProfile
@@ -103,7 +108,8 @@ namespace VideoTranscoder.VideoTranscoder.Application.Configurations
                         Height = 480,
                         Bitrate = "1500k",
                         CreatedAt = DateTime.UtcNow,
-                        FormatType = "hls"
+                        FormatType = "hls",
+                        BrowserType  = "Chrome"
                     };
 
                     var encoding7 = new EncodingProfile
@@ -115,7 +121,8 @@ namespace VideoTranscoder.VideoTranscoder.Application.Configurations
                         Height = 360,
                         Bitrate = "800k",
                         CreatedAt = DateTime.UtcNow,
-                        FormatType = "hls"
+                        FormatType = "hls",
+                        BrowserType  = "Chrome"
                     };
 
                     var encoding8 = new EncodingProfile
@@ -127,7 +134,8 @@ namespace VideoTranscoder.VideoTranscoder.Application.Configurations
                         Height = 240,
                         Bitrate = "400k",
                         CreatedAt = DateTime.UtcNow,
-                        FormatType = "hls"
+                        FormatType = "hls",
+                        BrowserType  = "Chrome"
                     };
 
                     var dash1 = new EncodingProfile
@@ -139,7 +147,8 @@ namespace VideoTranscoder.VideoTranscoder.Application.Configurations
                         Height = 2160,
                         Bitrate = "18000k",
                         CreatedAt = DateTime.UtcNow,
-                        FormatType = "dash"
+                        FormatType = "dash",
+                        BrowserType  = "Chrome"
                     };
 
                     var dash2 = new EncodingProfile
@@ -151,19 +160,21 @@ namespace VideoTranscoder.VideoTranscoder.Application.Configurations
                         Height = 1080,
                         Bitrate = "5000k",
                         CreatedAt = DateTime.UtcNow,
-                        FormatType = "dash"
+                        FormatType = "dash",
+                        BrowserType  = "Chrome"
                     };
 
                     var dash3 = new EncodingProfile
                     {
-                        Name = "H.264 720p",
-                        FfmpegArgs = "-c:v libx264 -s 1280x720 -b:v 3000k -crf 23 -preset medium -r 30 -g 120 -keyint_min 120 -sc_threshold 0 -c:a aac -b:a 128k -f dash -seg_duration 4 -use_template 1 -use_timeline 1 -init_seg_name init-$RepresentationID$.mp4 -media_seg_name chunk-$RepresentationID$-$Number$.m4s -adaptation_sets \"id=0,streams=v id=1,streams=a\"",
+                        Name = "H.265 720p",
+                        FfmpegArgs = "-c:v libx265 -s 1280x720 -b:v 3000k -crf 23 -preset medium -r 30 -g 120 -keyint_min 120 -sc_threshold 0 -c:a aac -b:a 128k -f dash -seg_duration 4 -use_template 1 -use_timeline 1 -init_seg_name init-$RepresentationID$.mp4 -media_seg_name chunk-$RepresentationID$-$Number$.m4s -adaptation_sets \"id=0,streams=v id=1,streams=a\"",
                         Resolution = "1280x720",
                         Width = 1280,
                         Height = 720,
                         Bitrate = "3000k",
                         CreatedAt = DateTime.UtcNow,
-                        FormatType = "dash"
+                        FormatType = "dash",
+                        BrowserType  = "Safari"
                     };
 
                     var dash4 = new EncodingProfile
@@ -175,7 +186,8 @@ namespace VideoTranscoder.VideoTranscoder.Application.Configurations
                         Height = 480,
                         Bitrate = "1500k",
                         CreatedAt = DateTime.UtcNow,
-                        FormatType = "dash"
+                        FormatType = "dash",
+                        BrowserType  = "Chrome"
                     };
 
                     var dash5 = new EncodingProfile
@@ -187,17 +199,17 @@ namespace VideoTranscoder.VideoTranscoder.Application.Configurations
                         Height = 360,
                         Bitrate = "800k",
                         CreatedAt = DateTime.UtcNow,
-                        FormatType = "dash"
+                        FormatType = "dash",
+                        BrowserType  = "Chrome"
                     };
 
 
-                    // context.EncodingProfiles.AddRange(
-                    //     encoding1, encoding2, encoding3, encoding4,
-                    //     encoding5, encoding6, encoding7, encoding8
-                    // );
                     context.EncodingProfiles.AddRange(
-    dash1, dash2, dash3, dash4, dash5
-);
+                        encoding1, encoding2, encoding3, encoding4,
+                        encoding5, encoding6, encoding7, encoding8,
+                        dash1, dash2, dash3, dash4, dash5
+                    );
+            
                 }
 
                 await context.SaveChangesAsync();

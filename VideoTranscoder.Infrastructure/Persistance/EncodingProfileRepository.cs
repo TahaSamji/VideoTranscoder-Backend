@@ -77,10 +77,10 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Persistance
         /// Retrieves all encoding profiles with a height less than or equal to the specified max height.
         /// Ordered by height (descending), then width (descending).
         /// </summary>
-        public async Task<List<EncodingProfile>> GetProfilesUpToHeightAsync(int maxHeight)
+        public async Task<List<EncodingProfile>> GetProfilesUpToHeightAndBrowserTypeAsync(int maxHeight,string browserType)
         {
             return await _dbcontext.EncodingProfiles
-                .Where(p => p.Height <= maxHeight)
+                .Where(p => p.Height <= maxHeight && p.BrowserType == browserType && p.IsActive)
                 .OrderByDescending(p => p.Height)
                 .ThenByDescending(p => p.Width)
                 .ToListAsync();

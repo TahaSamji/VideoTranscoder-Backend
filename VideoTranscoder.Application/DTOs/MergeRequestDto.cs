@@ -31,10 +31,14 @@ public class MergeRequestDto
     [JsonPropertyName("resolution")]
     [Required(ErrorMessage = "Resolution is required.")]
     [RegularExpression(@"^\d+x\d+$", ErrorMessage = "Resolution must be in the format WIDTHxHEIGHT (e.g., 1920x1080).")]
-    public  required string Resolution { get; set; }
+    public required string Resolution { get; set; }
 
     [JsonPropertyName("mimeType")]
     [Required(ErrorMessage = "MIMEType is required.")]
     [RegularExpression(@"^video\/[a-zA-Z0-9\.\-\+]+$", ErrorMessage = "Invalid MIME type format.")]
     public required string MIMEType { get; set; }
+
+    [JsonPropertyName("browserType")]
+    [Required(ErrorMessage = "BrowserType is required.")]
+    public required string BrowserType { get; set; }
 }

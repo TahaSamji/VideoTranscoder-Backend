@@ -162,7 +162,7 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
             {
                 // Check if the local temp output directory exists
                 if (!Directory.Exists(tempOutputDir))
-                    throw new DirectoryNotFoundException($"❌ Temp output directory not found: {tempOutputDir}");
+                    throw new NotFoundException($"❌ Temp output directory not found: {tempOutputDir}");
 
                 string containerName = _azureOptions.ContainerName;
                 var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
@@ -330,7 +330,7 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
             {
                 // Check if the thumbnail directory exists
                 if (!Directory.Exists(localDirectoryPath))
-                    throw new DirectoryNotFoundException($"Thumbnail directory not found: {localDirectoryPath}");
+                    throw new NotFoundException($"Thumbnail directory not found: {localDirectoryPath}");
 
                 // Get container name from configuration
                 string containerName = _azureOptions.ContainerName;

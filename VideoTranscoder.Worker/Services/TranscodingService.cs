@@ -60,7 +60,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
         if (videoFile == null || encodingProfile == null)
         {
             _logger.LogWarning("⚠️ Video file or encoding profile not found for FileId: {FileId}, ProfileId: {ProfileId}", request.FileId, request.EncodingProfileId);
-            throw new InvalidOperationException("Video file or encoding profile not found.");
+            throw new NotFoundException("Video file or encoding profile not found.");
         }
 
         // Check for existing job to ensure idempotency

@@ -30,7 +30,10 @@ namespace VideoTranscoder.VideoTranscoder.Domain.Entities
 
     [JsonPropertyName("created_at")]
     public DateTime CreatedAt { get; set; }
-    
-     public bool IsActive { get; set; } = true;
+
+    public bool IsActive { get; set; } = true;
+     
+      [JsonPropertyName("browser_type")]
+     public required string BrowserType { get; set; }
   }
 }

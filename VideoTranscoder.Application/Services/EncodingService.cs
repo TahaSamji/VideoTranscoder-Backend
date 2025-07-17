@@ -37,7 +37,9 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 FormatType = profile.FormatType,
                 CreatedAt = profile.CreatedAt,
                 Width = width,
-                Height = height
+                Height = height,
+                BrowserType = profile.BrowserType
+
             };
 
             // Save the new profile to the database

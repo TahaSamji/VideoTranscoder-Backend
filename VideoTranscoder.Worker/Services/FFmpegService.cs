@@ -191,7 +191,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
 
                 // Ensure the input video file exists
                 if (!File.Exists(filePath))
-                    throw new FileNotFoundException($"Input video file not found: {filePath}");
+                    throw new NotFoundException($"Input video file not found: {filePath}");
 
                 // Prepare output file pattern for thumbnails (e.g., thumb_001.jpg, thumb_002.jpg, ...)
                 string outputPattern = Path.Combine(thumbnailDir, "thumb_%03d.jpg");

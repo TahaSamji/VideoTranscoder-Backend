@@ -95,7 +95,7 @@ public class ThumbnailService : IThumbnailService
         var currentThumbnail = await _thumbnailRepository.GetByIdAsync(thumbnailId);
         if (currentThumbnail == null)
         {
-            throw new Exception("Current thumbnail not found after update.");
+            throw new NotFoundException("Current thumbnail not found after update.");
         }
 
         // Step 3: Update the default thumbnail URL in the video metadata

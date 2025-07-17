@@ -23,37 +23,74 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
         [HttpPost("create-encoding-profiles")]
         public async Task<IActionResult> CreateEncodingProfile([FromBody] EncodingProfile profile)
         {
-            Console.WriteLine(profile);
-            var result = await _encodingProfileService.CreateProfileAsync(profile);
+            try
+            {
 
-            return Ok(result);
+                var result = await _encodingProfileService.CreateProfileAsync(profile);
+
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                // Handle domain-level custom exceptions
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                // Handle unexpected errors
+                return StatusCode(500, new { message = "An unexpected error occurred.", details = ex.Message });
+            }
         }
 
         [HttpPut("update-encoding-profile/{id}")]
         public async Task<IActionResult> UpdateEncodingProfile(int id, [FromBody] EncodingProfile updatedProfile)
         {
-            if (id != updatedProfile.Id)
-                return BadRequest("Encoding profile ID mismatch.");
+            try
+            {
+                if (id != updatedProfile.Id)
+                    return BadRequest("Encoding profile ID mismatch."); // ID validation
 
-            var result = await _encodingProfileService.UpdateProfileAsync(id, updatedProfile);
+                var result = await _encodingProfileService.UpdateProfileAsync(id, updatedProfile);
 
-            if (result == null)
-                return NotFound($"Encoding profile with ID {id} not found.");
+                if (result == null)
+                    return NotFound($"Encoding profile with ID {id} not found.");
 
-            return Ok(result);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                // Handle domain-level custom exceptions
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                // Handle unexpected errors
+                return StatusCode(500, new { message = "An unexpected error occurred.", details = ex.Message });
+            }
         }
 
         [HttpDelete("delete-encoding-profile/{id}")]
         public async Task<IActionResult> DeleteEncodingProfile(int id)
         {
-            var deleted = await _encodingProfileService.DeleteProfileAsync(id);
-            if (!deleted)
-                return NotFound($"EncodingProfile with ID {id} not found.");
+            try
+            {
+                var deleted = await _encodingProfileService.DeleteProfileAsync(id);
 
-            return Ok($"EncodingProfile with ID {id} has been deleted.");
+                if (!deleted)
+                    return NotFound($"EncodingProfile with ID {id} not found.");
+
+                return Ok($"EncodingProfile with ID {id} has been deleted.");
+            }
+            catch (ArgumentException ex)
+            {
+                // Handle domain-level custom exceptions
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                // Handle unexpected errors
+                return StatusCode(500, new { message = "An unexpected error occurred.", details = ex.Message });
+            }
         }
-
-
-
     }
 }
