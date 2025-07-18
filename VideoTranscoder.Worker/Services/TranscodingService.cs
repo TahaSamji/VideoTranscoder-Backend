@@ -76,7 +76,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
         {
             VideoFileId = request.FileId,
             EncodingProfileId = request.EncodingProfileId,
-            Status = VideoProcessStatus.Queued.ToString(),
+            Status = VideoProcessStatus.InProgress.ToString(),
             CreatedAt = DateTime.UtcNow,
            
         };
@@ -123,7 +123,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             _logger.LogInformation("🎞️ Video variant saved for FileId: {FileId}, JobId: {JobId}", videoFile.Id, job.Id);
 
             // Check if all renditions are complete and trigger cleanup
-            await _completionService.CheckAndCleanIfAllJobsCompleteAsync(request.TotalRenditions, videoFile.Id, request.LocalVideoPath);
+            await _completionService.CheckAndCleanIfAllJobsFinishedAsync(request.TotalRenditions, videoFile.Id, request.LocalVideoPath);
         }
         catch (Exception transcodeEx)
         {

@@ -66,7 +66,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             {
                 // Cleanup temporary directory regardless of success/failure
                 await _cleanerService.CleanDirectoryContentsAsync(outputDir);
-                _logger.LogInformation("🧹 Cleaned up temporary directory: {OutputDir}", outputDir);
+                // _logger.LogInformation("🧹 Cleaned up temporary directory: {OutputDir}", outputDir);
             }
         }
 

@@ -16,8 +16,8 @@ namespace VideoTranscoder.VideoTranscoder.Application.Interfaces
         // Updates the status (e.g., Pending, Completed, Failed) of a job by its Id
         Task UpdateStatusAsync(int jobId, string newStatus);
 
-        // Counts the number of completed jobs for a specific video file
-        Task<int> CountCompletedJobsByFileIdAsync(int fileId);
+        // Counts the number of Finished jobs for a specific video file
+        Task<int> CountFinishedJobsByFileIdAsync(int fileId);
 
         // Updates the job status to error and saves the error message
         Task UpdateErrorStatusAsync(int id, string v, string message);

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using VideoTranscoder.VideoTranscoder.Application.enums;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
 using VideoTranscoder.VideoTranscoder.Domain.DatabaseContext;
 using VideoTranscoder.VideoTranscoder.Domain.Entities;
@@ -68,10 +69,10 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Persistance
         /// <summary>
         /// Counts the number of completed transcoding jobs for a given file ID.
         /// </summary>
-        public async Task<int> CountCompletedJobsByFileIdAsync(int fileId)
+        public async Task<int> CountFinishedJobsByFileIdAsync(int fileId)
         {
             return await _dbContext.TranscodingJobs
-                .Where(j => j.VideoFileId == fileId && j.Status == "Completed")
+                .Where(j => j.VideoFileId == fileId && j.Status != VideoProcessStatus.InProgress.ToString())
                 .CountAsync();
         }
 
@@ -90,5 +91,7 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Persistance
             job.ErrorMessage = errorMessage!;
             await _dbContext.SaveChangesAsync();
         }
+      
+
     }
 }

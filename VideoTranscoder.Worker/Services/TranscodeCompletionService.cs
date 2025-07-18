@@ -34,10 +34,12 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
         /// <param name="totalVariantCount">Expected number of renditions/variants</param>
         /// <param name="fileId">ID of the original video file</param>
         /// <param name="inputFilePath">Path to the input video file</param>
-        public async Task CheckAndCleanIfAllJobsCompleteAsync(int totalVariantCount, int fileId, string inputFilePath)
+        public async Task CheckAndCleanIfAllJobsFinishedAsync(int totalVariantCount, int fileId, string inputFilePath)
+
         {
+            
             // Get the number of completed transcoding jobs for the file
-            var completedJobCount = await _transcodingJobRepository.CountCompletedJobsByFileIdAsync(fileId);
+            var completedJobCount = await _transcodingJobRepository.CountFinishedJobsByFileIdAsync(fileId);
 
             // If all expected variants are completed, clean up local directory
             if (completedJobCount == totalVariantCount)
@@ -46,12 +48,16 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                     "✅ All {Count} transcoding jobs for FileId {FileId} are complete. Cleaning local input directory...",
                     completedJobCount, fileId
                 );
-                 // Update Video Status to Completed
+                // Update Video Status to Completed
                 await _videoRepository.UpdateStatusAsync(fileId, VideoProcessStatus.Completed.ToString());
+                //Clean output Dir
+                // string currentDir = Directory.GetCurrentDirectory();
+                // var outputDir = Path.Combine(currentDir, "temp", $"{userId}", $"{fileId}");
                 // Get parent directory of the video file path (e.g., .../input/userId/fileId/videos)
                 string? parentDirectory = Directory.GetParent(inputFilePath)?.FullName;
 
                 // Clean all files inside the parent directory
+                // await _cleanerService.CleanDirectoryContentsAsync(outputDir);
                 await _cleanerService.CleanDirectoryContentsAsync(parentDirectory!);
             }
             else
