@@ -35,7 +35,7 @@ public class VideoVariantRepository : IVideoVariantRepository
     /// </summary>
     /// <param name="fileId">The ID of the video file to fetch variants for.</param>
     /// <returns>A list of video variants for the specified file.</returns>
-    public async Task<List<VideoVariant>> GetVariantsByFileIdIfCompletedAsync(int fileId)
+    public async Task<List<VideoVariant>> GetVariantsByFileIdAsync(int fileId)
     {
         return await _dbContext.VideoVariants
             .Where(v => v.VideoFileId == fileId)

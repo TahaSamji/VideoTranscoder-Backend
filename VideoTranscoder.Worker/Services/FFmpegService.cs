@@ -27,36 +27,31 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             var outputDir = Path.Combine(currentDir, $"{Constants.tempFolder}", $"{userId}", $"{fileId}", $"{encodingProfile.Id}");
             Directory.CreateDirectory(outputDir);
 
-            // Create HLS and DASH output subdirectories
-            string hlsDir = Path.Combine(outputDir, $"{Constants.hlsFolder}");
-            string dashDir = Path.Combine(outputDir, $"{Constants.dashFolder}");
+            // Create an appropriate FFmpeg command builder based on the format type (e.g., "hls" or "dash")
+            var builder = FfmpegCommandBuilderFactory.Create(encodingProfile.FormatType)
 
-          
-            
+                // Set the input file path for the FFmpeg command
+                .SetInputFile(filePath)
 
-            // Determine FFmpeg command based on encoding profile type (DASH or HLS)
-            string ffmpegArgs;
-            var drawTextFilter = $"-vf \"drawtext=text='{Constants.DefaultWatermarkText}':fontcolor=white:fontsize=24:x=10:y=10\"";
-            if (encodingProfile.FormatType?.ToLower() == "dash")
-            {
-                Directory.CreateDirectory(dashDir);
-                ffmpegArgs = $"-y -i \"{filePath}\" {drawTextFilter} {encodingProfile.FfmpegArgs} \"{dashDir}/manifest.mpd\"";
-            }
-            else if (encodingProfile.FormatType?.ToLower() == "hls")
-            {
-                  Directory.CreateDirectory(hlsDir);
-                ffmpegArgs = $"-y -i \"{filePath}\"  {drawTextFilter} {encodingProfile.FfmpegArgs} " +
-                             $"-hls_segment_filename \"{hlsDir}/segment_%03d.m4s\" " +
-                             $"\"{hlsDir}/playlist.m3u8\"";
-            }
-            else
-            {
-                // Unsupported profile type
-                throw new InvalidOperationException($"Unsupported encoding profile type: {encodingProfile.FormatType}");
-            }
+                // Apply watermark text to the video using drawtext filter
+                .SetDrawText(Constants.DefaultWatermarkText)
+
+                // Set additional encoding arguments like bitrate, codec, resolution, etc.
+                .SetEncodingArgs(encodingProfile.FfmpegArgs)
+
+                // Set the output directory where the encoded files will be saved
+                .SetOutputDirectory(outputDir);
+
+            // Build the final FFmpeg command string with all the configured parameters
+            var ffmpegArgs = builder.Build();
+
+
+
 
             // Log the final FFmpeg command
             _logger.LogInformation("🎬 FFmpeg command for transcoding: {FFmpegArgs}", ffmpegArgs);
+            // _logger.LogInformation("🎬 FFmpeg command for transcoding Builder: {FFmpegArgs}", builderffmpegArgs);
+
 
             try
             {
@@ -258,3 +253,30 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
     }
 
 }
+
+// Create HLS and DASH output subdirectories
+// string hlsDir = Path.Combine(outputDir, $"{Constants.hlsFolder}");
+// string dashDir = Path.Combine(outputDir, $"{Constants.dashFolder}");
+// string ffmpegArgs;
+// var drawTextFilter = $"-vf \"drawtext=text='{Constants.DefaultWatermarkText}':fontcolor=white:fontsize=24:x=10:y=10\"";
+// if (encodingProfile.FormatType?.ToLower() == "dash")
+// {
+//     Directory.CreateDirectory(dashDir);
+//     ffmpegArgs = $"-y -i \"{filePath}\" {drawTextFilter} {encodingProfile.FfmpegArgs} \"{dashDir}/manifest.mpd\"";
+// }
+// else if (encodingProfile.FormatType?.ToLower() == "hls")
+// {
+//       Directory.CreateDirectory(hlsDir);
+//     ffmpegArgs = $"-y -i \"{filePath}\"  {drawTextFilter} {encodingProfile.FfmpegArgs} " +
+//                  $"-hls_segment_filename \"{hlsDir}/segment_%03d.m4s\" " +
+//                  $"\"{hlsDir}/playlist.m3u8\"";
+// }
+// else
+// {
+//     // Unsupported profile type
+//     throw new InvalidOperationException($"Unsupported encoding profile type: {encodingProfile.FormatType}");
+// }
+
+            // Determine FFmpeg command based on encoding profile type (DASH or HLS)
+            // var builder = FfmpegCommandBuilderFactory.GetBuilder(encodingProfile.FormatType);
+            // string ffmpegArgs = builder.Build(filePath, encodingProfile, outputDir);

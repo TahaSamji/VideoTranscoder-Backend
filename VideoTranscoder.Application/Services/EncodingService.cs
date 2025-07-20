@@ -48,6 +48,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
             return entity;
         }
 
+        //Soft Delete the encoding Profile with the given id
         public async Task<bool> DeleteProfileAsync(int id)
         {
             var existing = await _repository.GetByIdAsync(id);
@@ -57,6 +58,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
             await _repository.DeleteAsync(id);
             return true;
         }
+        // Update the encoding Profile
         public async Task<EncodingProfile?> UpdateProfileAsync(int id, EncodingProfile updatedProfile)
         {
             if (id != updatedProfile.Id)

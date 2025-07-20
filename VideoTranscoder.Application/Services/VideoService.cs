@@ -61,7 +61,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 _logger.LogInformation("🔍 Fetching video renditions for fileId: {FileId}", fileId);
 
                 // Fetch all completed video variants (renditions) for the given fileId
-                var variants = await _videoVariantRepository.GetVariantsByFileIdIfCompletedAsync(fileId);
+                var variants = await _videoVariantRepository.GetVariantsByFileIdAsync(fileId);
 
                 // If no variants found, log a warning and return an empty list
                 if (variants == null || !variants.Any())

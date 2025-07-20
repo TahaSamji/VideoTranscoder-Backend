@@ -4,6 +4,7 @@ using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
 using Microsoft.Extensions.Options;
 using VideoTranscoder.VideoTranscoder.Application.Configurations;
+using VideoTranscoder.VideoTranscoder.Application.constants;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
 
 
@@ -248,7 +249,7 @@ namespace VideoTranscoder.VideoTranscoder.Infrastructure.Storage
         public async Task<string> DownloadVideoToLocalAsync(string filename, int userId, int fileId)
         {
             string currentDir = Directory.GetCurrentDirectory();
-            string inputDir = Path.Combine(currentDir, "input", $"{userId}", $"{fileId}");
+            string inputDir = Path.Combine(currentDir, Constants.inputFolder, $"{userId}", $"{fileId}");
             string localFilePath = Path.Combine(inputDir, filename);
 
             try

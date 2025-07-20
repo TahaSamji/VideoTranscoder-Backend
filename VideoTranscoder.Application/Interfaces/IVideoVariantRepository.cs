@@ -8,6 +8,6 @@ namespace VideoTranscoder.VideoTranscoder.Application.Interfaces
         Task SaveAsync(VideoVariant variant);
 
         // Retrieves all video variants for a given file only if the transcoding job has completed.
-        Task<List<VideoVariant>> GetVariantsByFileIdIfCompletedAsync(int fileId);
+        Task<List<VideoVariant>> GetVariantsByFileIdAsync(int fileId);
     }
 }

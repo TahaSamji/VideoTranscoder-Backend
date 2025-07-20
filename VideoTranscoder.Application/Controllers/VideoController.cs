@@ -48,7 +48,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
             {
                 return Unauthorized(new
                 {
-                    message = "Unauthorized. Please log in again."
+                    message = ex.Message
                 });
             }
             catch (VideoAlreadyExistsException ex)

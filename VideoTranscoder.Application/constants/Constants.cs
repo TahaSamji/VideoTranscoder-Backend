@@ -6,6 +6,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.constants
         public const string DefaultWatermarkText = "© VIDIZMO";
         public const string DefaultDateFormat = "yyyy-MM-dd HH:mm:ss";
         public const string tempFolder = "temp";
+         public const string inputFolder = "input";
         public const string hlsFolder = "hls";
         public const string dashFolder = "dash";
         public const string ffmpegPath = "ffmpeg";

@@ -40,7 +40,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Interfaces
         Task<string> DownloadVideoToLocalAsync(string filename, int userId, int fileId);
 
         /// <summary>
-        /// Uploads the final transcoded video output (HLS/DASH/CMAF) from a local directory to blob storage.
+        /// Uploads the final transcoded video output (HLS/DASH) from a local directory to blob storage.
         /// </summary>
         /// <param name="tempOutputDir">Path to the local folder containing transcoded files.</param>
         /// <param name="fileName">Original file name.</param>
