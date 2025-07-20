@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using VideoTranscoder.VideoTranscoder.Application.constants;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
 using VideoTranscoder.VideoTranscoder.Domain.Entities;
 
@@ -23,25 +24,28 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
         {
             // Create output directory for current user, file, and encoding profile
             string currentDir = Directory.GetCurrentDirectory();
-            var outputDir = Path.Combine(currentDir, "temp", $"{userId}", $"{fileId}", $"{encodingProfile.Id}");
+            var outputDir = Path.Combine(currentDir, $"{Constants.tempFolder}", $"{userId}", $"{fileId}", $"{encodingProfile.Id}");
             Directory.CreateDirectory(outputDir);
 
             // Create HLS and DASH output subdirectories
-            string hlsDir = Path.Combine(outputDir, "hls");
-            string dashDir = Path.Combine(outputDir, "dash");
+            string hlsDir = Path.Combine(outputDir, $"{Constants.hlsFolder}");
+            string dashDir = Path.Combine(outputDir, $"{Constants.dashFolder}");
 
-            Directory.CreateDirectory(hlsDir);
-            Directory.CreateDirectory(dashDir);
+          
+            
 
             // Determine FFmpeg command based on encoding profile type (DASH or HLS)
             string ffmpegArgs;
+            var drawTextFilter = $"-vf \"drawtext=text='{Constants.DefaultWatermarkText}':fontcolor=white:fontsize=24:x=10:y=10\"";
             if (encodingProfile.FormatType?.ToLower() == "dash")
             {
-                ffmpegArgs = $"-y -i \"{filePath}\" {encodingProfile.FfmpegArgs} \"{dashDir}/manifest.mpd\"";
+                Directory.CreateDirectory(dashDir);
+                ffmpegArgs = $"-y -i \"{filePath}\" {drawTextFilter} {encodingProfile.FfmpegArgs} \"{dashDir}/manifest.mpd\"";
             }
             else if (encodingProfile.FormatType?.ToLower() == "hls")
             {
-                ffmpegArgs = $"-y -i \"{filePath}\" {encodingProfile.FfmpegArgs} " +
+                  Directory.CreateDirectory(hlsDir);
+                ffmpegArgs = $"-y -i \"{filePath}\"  {drawTextFilter} {encodingProfile.FfmpegArgs} " +
                              $"-hls_segment_filename \"{hlsDir}/segment_%03d.m4s\" " +
                              $"\"{hlsDir}/playlist.m3u8\"";
             }
@@ -79,7 +83,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName = "ffmpeg",
+                    FileName = $"{Constants.ffmpegPath}",
                     Arguments = args,
                     RedirectStandardError = true, // Capture error output from FFmpeg
                     UseShellExecute = false,
@@ -126,7 +130,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
 
                 var processStartInfo = new ProcessStartInfo
                 {
-                    FileName = "ffmpeg",
+                    FileName = $"{Constants.ffmpegPath}",
                     Arguments = ultraFastArgs,
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
@@ -186,7 +190,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             {
                 // Construct local thumbnail output directory
                 string currentDir = Directory.GetCurrentDirectory();
-                string thumbnailDir = Path.Combine(currentDir, "temp", $"{userId}", $"{fileId}", "thumbnails");
+                string thumbnailDir = Path.Combine(currentDir, $"{Constants.tempFolder}", $"{userId}", $"{fileId}", $"{Constants.thumbnailsFolder}");
                 Directory.CreateDirectory(thumbnailDir);
 
                 // Ensure the input video file exists
@@ -204,7 +208,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
 
                 var psi = new ProcessStartInfo
                 {
-                    FileName = "ffmpeg",
+                    FileName = $"{Constants.ffmpegPath}",
                     Arguments = ffmpegArgs,
                     RedirectStandardError = true,
                     RedirectStandardOutput = true,

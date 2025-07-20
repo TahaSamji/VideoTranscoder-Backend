@@ -1,5 +1,6 @@
 using Azure.Messaging.ServiceBus;
 using System.Text.Json;
+using VideoTranscoder.VideoTranscoder.Application.constants;
 using VideoTranscoder.VideoTranscoder.Application.DTOs;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
 
@@ -69,7 +70,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                 // Process the video transcoding
                 var result = await transcodingService.TranscodeVideoAsync(request, args.CancellationToken);
 
-                if (result.Equals("Success"))
+                if (result.Equals($"{Constants.Success}"))
                 {
                     _logger.LogInformation("Successfully processed transcoding for FileId: {FileId}", request.FileId);
                     await args.CompleteMessageAsync(args.Message); // Acknowledge message success

@@ -15,8 +15,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
         /// <param name="directoryPath">Absolute path to the directory to be cleaned</param>
         public async Task CleanDirectoryContentsAsync(string directoryPath)
         {
-            // Log the path received for cleanup
-            Console.WriteLine($"Directory Path given : {directoryPath}");
+
 
             try
             {

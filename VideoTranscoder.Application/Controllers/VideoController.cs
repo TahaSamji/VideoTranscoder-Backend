@@ -99,11 +99,6 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
                 // Return the videos in response
                 return Ok(pagedVideos);
             }
-            catch (NotFoundException ex)
-            {
-                // If no videos are found for the user
-                return NotFound(new { message = ex.Message });
-            }
             catch (UnauthorizedAccessException ex)
             {
                 // If user is unauthorized

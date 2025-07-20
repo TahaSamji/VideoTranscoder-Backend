@@ -92,11 +92,7 @@ public class ThumbnailService : IThumbnailService
         await _thumbnailRepository.SetDefaultThumbnailAsync(thumbnailId);
 
         // Step 2: Fetch the selected thumbnail to retrieve its URL
-        var currentThumbnail = await _thumbnailRepository.GetByIdAsync(thumbnailId);
-        if (currentThumbnail == null)
-        {
-            throw new NotFoundException("Current thumbnail not found after update.");
-        }
+        var currentThumbnail = await _thumbnailRepository.GetByIdAsync(thumbnailId) ?? throw new NotFoundException("Current thumbnail not found after update.");
 
         // Step 3: Update the default thumbnail URL in the video metadata
         await _videoRepository.UpdateThumbnailUrlAsync(fileId, currentThumbnail.BlobUrl);

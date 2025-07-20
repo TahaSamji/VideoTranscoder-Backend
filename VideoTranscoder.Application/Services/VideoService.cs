@@ -51,11 +51,6 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
         {
             // Fetch videos uploaded by the user
             var videos = await _videoRepository.GetAllByUserIdAsync(userId, page, pageSize);
-
-            // Throw NotFoundException if no videos are found
-            if (videos == null || !videos.Any())
-                throw new NotFoundException($"No videos found for userId: {userId}");
-
             return videos;
         }
         public async Task<List<VideoRenditionDto>> GetVideoRenditionsByFileIdAsync(int fileId)
@@ -72,7 +67,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 if (variants == null || !variants.Any())
                 {
                     _logger.LogWarning("⚠️ No completed variants found for fileId: {FileId}", fileId);
-                    throw new NotFoundException($"No completed video variants found for fileId: {fileId}");
+                    return [];
                 }
 
                 // Convert variants into DTOs for response
@@ -145,7 +140,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 string inputFilePath = await _cloudStorageService.DownloadVideoToLocalAsync(request.OutputFileName, userId, videoMetaData.Id);
                 // Send transcode request
                 //  Fetch all matching encoding profiles by height
-                var encodingProfiles = await _encodingProfileRepository.GetProfilesUpToHeightAndBrowserTypeAsync(request.Height,request.BrowserType);
+                var encodingProfiles = await _encodingProfileRepository.GetProfilesUpToHeightAndBrowserTypeAsync(request.Height, request.BrowserType);
 
                 if (!encodingProfiles.Any())
                 {

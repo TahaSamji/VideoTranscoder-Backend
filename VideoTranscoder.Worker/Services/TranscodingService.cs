@@ -1,7 +1,7 @@
 
-using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using VideoTranscoder.VideoTranscoder.Application.Configurations;
+using VideoTranscoder.VideoTranscoder.Application.constants;
 using VideoTranscoder.VideoTranscoder.Application.DTOs;
 using VideoTranscoder.VideoTranscoder.Application.enums;
 using VideoTranscoder.VideoTranscoder.Application.Interfaces;
@@ -68,7 +68,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
         if (job != null)
         {
             _logger.LogInformation("ℹ️ Transcoding job already exists (JobId: {JobId}) for FileId: {FileId}", job.Id, request.FileId);
-            return "fail";
+            return $"{Constants.Failure}";
         }
 
         // Create new job record
@@ -99,7 +99,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             await _transcodingJobRepository.UpdateStatusAsync(job.Id, VideoProcessStatus.Completed.ToString());
 
             // Build output path for manifest
-            string outputFileName = encodingProfile.FormatType == "hls" ? "playlist.m3u8" : "manifest.mpd";
+            string outputFileName = encodingProfile.FormatType == "hls" ? $"{Constants.hlsManifest}" : $"{Constants.dashManifest}";
             string storagePath = $"{_azureOptions.ContainerName}/{videoBlobPath}/{encodingProfile.FormatType}/{outputFileName}";
 
             // Generate signed CDN URL
@@ -123,7 +123,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             _logger.LogInformation("🎞️ Video variant saved for FileId: {FileId}, JobId: {JobId}", videoFile.Id, job.Id);
 
             // Check if all renditions are complete and trigger cleanup
-            await _completionService.CheckAndCleanIfAllJobsFinishedAsync(request.TotalRenditions, videoFile.Id, request.LocalVideoPath);
+            await _completionService.CheckAndCleanIfAllJobsFinishedAsync(request.TotalRenditions, videoFile.Id, request.LocalVideoPath,videoFile.UserId);
         }
         catch (Exception transcodeEx)
         {
@@ -136,12 +136,12 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
             throw;
         }
 
-        return "Success";
+        return $"{Constants.Success}";
     }
     catch (Exception ex)
     {
         _logger.LogError(ex, "❌ Unexpected error occurred while processing FileId: {FileId}", request.FileId);
-        return "Failed";
+        return $"{Constants.Failure}";
     }
 }
 

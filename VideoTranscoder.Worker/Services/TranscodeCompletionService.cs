@@ -34,7 +34,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
         /// <param name="totalVariantCount">Expected number of renditions/variants</param>
         /// <param name="fileId">ID of the original video file</param>
         /// <param name="inputFilePath">Path to the input video file</param>
-        public async Task CheckAndCleanIfAllJobsFinishedAsync(int totalVariantCount, int fileId, string inputFilePath)
+        public async Task CheckAndCleanIfAllJobsFinishedAsync(int totalVariantCount, int fileId, string inputFilePath,int userId)
 
         {
             
@@ -51,13 +51,13 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                 // Update Video Status to Completed
                 await _videoRepository.UpdateStatusAsync(fileId, VideoProcessStatus.Completed.ToString());
                 //Clean output Dir
-                // string currentDir = Directory.GetCurrentDirectory();
-                // var outputDir = Path.Combine(currentDir, "temp", $"{userId}", $"{fileId}");
+                string currentDir = Directory.GetCurrentDirectory();
+                var outputDir = Path.Combine(currentDir, "temp", $"{userId}", $"{fileId}");
                 // Get parent directory of the video file path (e.g., .../input/userId/fileId/videos)
                 string? parentDirectory = Directory.GetParent(inputFilePath)?.FullName;
 
                 // Clean all files inside the parent directory
-                // await _cleanerService.CleanDirectoryContentsAsync(outputDir);
+                await _cleanerService.CleanDirectoryContentsAsync(outputDir);
                 await _cleanerService.CleanDirectoryContentsAsync(parentDirectory!);
             }
             else
