@@ -12,8 +12,11 @@ namespace VideoTranscoder.VideoTranscoder.Application.Interfaces
 
         Task<int> GetTotalCountAsync(); // Get total number of encoding profiles 
 
-        Task<List<EncodingProfile>> GetProfilesUpToHeightAndBrowserTypeAsync(int maxHeight,string browserType); // Get all profiles with resolution height <= specified max
+        Task<List<EncodingProfile>> GetSelectedProfilesUpToHeightAsync(int maxHeight); // Get all profiles with resolution height <= specified max
 
         Task<bool> DeleteAsync(int id); // Soft Delete an encoding profile by ID, returns true if successful
+
+        // Task UpdateAdminSelectionAsync(int profileId, bool isSelected);
+        Task UpdateAdminSelectionAsync(int profileId, bool isSelected);
     }
 }

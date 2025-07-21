@@ -28,7 +28,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
     {
         // Private fields to store various parts of the FFmpeg command
         private string _inputFile  = string.Empty; // Path to input video file
-        private string _drawText = $"-vf \"drawtext=text='{Constants.DefaultWatermarkText}':fontcolor=white:fontsize=24:x=10:y=10\""; // Default watermark
+        private string  _drawText = $"-vf \"drawtext=text='{Constants.DefaultWatermarkText}':fontfile='C\\:/Windows/Fonts/arialbd.ttf':fontcolor=white:fontsize=24:x=10:y=10\"";
         private string _encodingArgs  = string.Empty; // Additional FFmpeg encoding arguments
         private string _outputDir  = string.Empty; // Directory where output files will be stored
 
@@ -49,7 +49,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
         // Overrides the default drawtext watermark with custom text
         public IFfmpegCommandBuilder SetDrawText(string text)
         {
-            _drawText = $"-vf \"drawtext=text='{text}':fontcolor=white:fontsize=24:x=10:y=10\"";
+           _drawText = $"-vf \"drawtext=text='{text}':fontfile='C\\:/Windows/Fonts/arialbd.ttf':fontcolor=white:fontsize=24:x=10:y=10\"";
             return this;
         }
 

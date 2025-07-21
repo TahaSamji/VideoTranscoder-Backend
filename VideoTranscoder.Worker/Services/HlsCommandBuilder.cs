@@ -31,7 +31,9 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
         private string _inputFile = string.Empty;
 
         // FFmpeg drawtext filter with default watermark text
-        private string _drawText = $"-vf \"drawtext=text='{Constants.DefaultWatermarkText}':fontcolor=white:fontsize=24:x=10:y=10\"";
+        private string _drawText = string.Empty;
+
+
 
         // Additional FFmpeg encoding arguments (bitrate, resolution, etc.)
         private string _encodingArgs = string.Empty;
@@ -49,7 +51,11 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
         // Sets custom watermark text for the drawtext filter
         public IFfmpegCommandBuilder SetDrawText(string text)
         {
-            _drawText = $"-vf \"drawtext=text='{text}':fontcolor=white:fontsize=24:x=10:y=10\"";
+        _drawText = $"-vf \"drawtext=text='{Constants.DefaultWatermarkText}':fontfile='C\\:/Windows/Fonts/arialbd.ttf':fontcolor=white:fontsize=24:x=10:y=10\"";
+
+
+
+
             return this;
         }
 
@@ -71,9 +77,12 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
         // Builds the final FFmpeg command string for HLS output
         public string Build()
         {
+            // return $"-y -i \"{_inputFile}\" {_drawText} {_encodingArgs} " +
+            //        $"-hls_segment_filename \"{_outputDir}/segment_%03d.m4s\" " +
+            //        $"\"{_outputDir}/playlist.m3u8\"";
             return $"-y -i \"{_inputFile}\" {_drawText} {_encodingArgs} " +
-                   $"-hls_segment_filename \"{_outputDir}/segment_%03d.m4s\" " +
-                   $"\"{_outputDir}/playlist.m3u8\"";
+                             $"-hls_segment_filename \"{_outputDir}/segment_%03d.m4s\" " +
+                             $"\"{_outputDir}/playlist.m3u8\"";
         }
     }
 }

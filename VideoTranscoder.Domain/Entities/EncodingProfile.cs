@@ -32,6 +32,7 @@ namespace VideoTranscoder.VideoTranscoder.Domain.Entities
     public DateTime CreatedAt { get; set; }
 
     public bool IsActive { get; set; } = true;
+    public bool IsAdminSelected { get; set; } = false;
      
       [JsonPropertyName("browser_type")]
      public required string BrowserType { get; set; }

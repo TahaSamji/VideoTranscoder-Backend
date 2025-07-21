@@ -140,7 +140,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
                 string inputFilePath = await _cloudStorageService.DownloadVideoToLocalAsync(request.OutputFileName, userId, videoMetaData.Id);
                 // Send transcode request
                 //  Fetch all matching encoding profiles by height
-                var encodingProfiles = await _encodingProfileRepository.GetProfilesUpToHeightAndBrowserTypeAsync(request.Height, request.BrowserType);
+                var encodingProfiles = await _encodingProfileRepository.GetSelectedProfilesUpToHeightAsync(request.Height);
 
                 if (!encodingProfiles.Any())
                 {

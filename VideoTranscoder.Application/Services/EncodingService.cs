@@ -48,6 +48,8 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
             return entity;
         }
 
+
+
         //Soft Delete the encoding Profile with the given id
         public async Task<bool> DeleteProfileAsync(int id)
         {
@@ -69,13 +71,46 @@ namespace VideoTranscoder.VideoTranscoder.Application.Services
             return updatedProfile;
         }
 
-        // Retrieves paginated list of encoding profiles along with total count
+        /// <summary>
+        /// Retrieves a paginated list of encoding profiles along with the total count.
+        /// </summary>
         public async Task<(List<EncodingProfile> Profiles, int TotalCount)> GetAllProfilesAsync(int pageNumber, int pageSize)
         {
-            var profiles = await _repository.GetAllAsync(pageNumber, pageSize); // Fetch paginated profiles
-            var totalCount = await _repository.GetTotalCountAsync();            // Fetch total profile count
+            try
+            {
+                // Fetch paginated encoding profiles for the current page
+                var profiles = await _repository.GetAllAsync(pageNumber, pageSize);
 
-            return (profiles, totalCount); // Return both in a tuple
+                // Fetch the total number of profiles for pagination UI
+                var totalCount = await _repository.GetTotalCountAsync();
+
+                return (profiles, totalCount); // Return tuple containing profiles and count
+            }
+            catch (Exception ex)
+            {
+                // Log the error or rethrow for controller-level handling
+                throw new InvalidOperationException("Error occurred while retrieving encoding profiles.", ex);
+            }
         }
+
+
+        /// <summary>
+        /// Updates the IsAdminSelected flag for a given encoding profile.
+        /// </summary>
+        public async Task UpdateSelectionAsync(int profileId, bool isSelected)
+        {
+            try
+            {
+                // Update admin selection flag in the repository
+                await _repository.UpdateAdminSelectionAsync(profileId, isSelected);
+
+            }
+            catch (Exception ex)
+            {
+                // Wrap and rethrow for centralized error handling
+                throw new InvalidOperationException("Error occurred while updating admin selection.", ex);
+            }
+        }
+
     }
 }

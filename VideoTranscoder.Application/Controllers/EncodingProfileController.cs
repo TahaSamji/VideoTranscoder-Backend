@@ -92,5 +92,28 @@ namespace VideoTranscoder.VideoTranscoder.Application.Controllers
                 return StatusCode(500, new { message = "An unexpected error occurred.", details = ex.Message });
             }
         }
+
+        [HttpGet("updateAdminSelection")]
+        public async Task<IActionResult> UpdateAdminSelectionAsync([FromQuery] int profileId, [FromQuery] bool isSelected)
+        {
+            try
+            {
+                await _encodingProfileService.UpdateSelectionAsync(profileId, isSelected);
+
+                return Ok(new { message = "Selection updated successfully." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
     }
 }

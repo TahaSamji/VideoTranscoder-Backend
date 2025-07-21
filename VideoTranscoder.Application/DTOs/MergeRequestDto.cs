@@ -38,7 +38,7 @@ public class MergeRequestDto
     [RegularExpression(@"^video\/[a-zA-Z0-9\.\-\+]+$", ErrorMessage = "Invalid MIME type format.")]
     public required string MIMEType { get; set; }
 
-    [JsonPropertyName("browserType")]
-    [Required(ErrorMessage = "BrowserType is required.")]
-    public required string BrowserType { get; set; }
+    // [JsonPropertyName("browserType")]
+    // [Required(ErrorMessage = "BrowserType is required.")]
+    // public required string BrowserType { get; set; }
 }
