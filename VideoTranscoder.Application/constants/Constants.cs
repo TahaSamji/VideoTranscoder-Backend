@@ -6,7 +6,7 @@ namespace VideoTranscoder.VideoTranscoder.Application.constants
         public const string DefaultWatermarkText = "© VIDIZMO";
         public const string DefaultDateFormat = "yyyy-MM-dd HH:mm:ss";
         public const string tempFolder = "temp";
-         public const string inputFolder = "input";
+        public const string inputFolder = "input";
         public const string hlsFolder = "hls";
         public const string dashFolder = "dash";
         public const string ffmpegPath = "ffmpeg";
@@ -15,6 +15,9 @@ namespace VideoTranscoder.VideoTranscoder.Application.constants
         public const string Success = "Success";
         public const string Failure = "Failure";
         internal static object thumbnailsFolder = "thumbnails";
+        public const string thumbnailDefaultScale = "320:180";
+        public const string thumbnailDefaultAmount = "5";
+        
 
         // FFmpeg Settings
     }

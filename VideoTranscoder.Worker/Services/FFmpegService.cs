@@ -73,19 +73,18 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
 
         private async Task RunFFmpegAsync(string args)
         {
-            // Prepare the FFmpeg process with the given arguments
-            var process = new Process
+            // Dispose the process properly to release file handles and avoid folder lock issues
+            using var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName = $"{Constants.ffmpegPath}",
+                    FileName = Constants.ffmpegPath,
                     Arguments = args,
                     RedirectStandardError = true, // Capture error output from FFmpeg
                     UseShellExecute = false,
                     CreateNoWindow = true
                 }
             };
-
             // Start the FFmpeg process
             process.Start();
 
@@ -104,71 +103,72 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                 _logger.LogError("❌ FFmpeg exited with code {ExitCode}: {Error}", process.ExitCode, stderr);
                 throw new Exception($"FFmpeg failed:\n{stderr}");
             }
+            // Automatically disposes the process here
         }
 
 
-        public async Task<Stream> GenerateThumbnailFromDirAsync(string time, string fileName, int userId, int fileId)
-        {
-            // Validate time input
-            if (string.IsNullOrEmpty(time))
-                throw new ArgumentException("Time cannot be null or empty", nameof(time));
+        // public async Task<Stream> GenerateThumbnailFromDirAsync(string time, string fileName, int userId, int fileId)
+        // {
+        //     // Validate time input
+        //     if (string.IsNullOrEmpty(time))
+        //         throw new ArgumentException("Time cannot be null or empty", nameof(time));
 
-            var thumbnailStream = new MemoryStream();
+        //     var thumbnailStream = new MemoryStream();
 
-            try
-            {
-                // Download video from Azure Blob to local path
-                string inputPath = await _cloudStorageService.DownloadVideoToLocalAsync(fileName, userId, fileId);
+        //     try
+        //     {
+        //         // Download video from Azure Blob to local path
+        //         string inputPath = await _cloudStorageService.DownloadVideoToLocalAsync(fileName, userId, fileId);
 
-                // Build FFmpeg command to capture one frame at the given timestamp and output it as a JPEG stream
-                var ultraFastArgs = $"-ss {time} -i \"{inputPath}\" -vframes 1 -f image2pipe -vcodec mjpeg -q:v 2 -an -s 320x180 pipe:1";
+        //         // Build FFmpeg command to capture one frame at the given timestamp and output it as a JPEG stream
+        //         var ultraFastArgs = $"-ss {time} -i \"{inputPath}\" -vframes 1 -f image2pipe -vcodec mjpeg -q:v 2 -an -s 320x180 pipe:1";
 
-                var processStartInfo = new ProcessStartInfo
-                {
-                    FileName = $"{Constants.ffmpegPath}",
-                    Arguments = ultraFastArgs,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                };
+        //         var processStartInfo = new ProcessStartInfo
+        //         {
+        //             FileName = $"{Constants.ffmpegPath}",
+        //             Arguments = ultraFastArgs,
+        //             UseShellExecute = false,
+        //             RedirectStandardOutput = true,
+        //             RedirectStandardError = true,
+        //             CreateNoWindow = true
+        //         };
 
-                _logger.LogInformation("📸 Starting FFmpeg process to generate thumbnail at time {Time} from file: {FileName}", time, fileName);
+        //         _logger.LogInformation("📸 Starting FFmpeg process to generate thumbnail at time {Time} from file: {FileName}", time, fileName);
 
-                using (var process = new Process { StartInfo = processStartInfo })
-                {
-                    process.Start();
+        //         using (var process = new Process { StartInfo = processStartInfo })
+        //         {
+        //             process.Start();
 
-                    // Copy FFmpeg output (JPEG image) to the memory stream
-                    await process.StandardOutput.BaseStream.CopyToAsync(thumbnailStream);
+        //             // Copy FFmpeg output (JPEG image) to the memory stream
+        //             await process.StandardOutput.BaseStream.CopyToAsync(thumbnailStream);
 
-                    // Wait until FFmpeg process completes
-                    await process.WaitForExitAsync();
+        //             // Wait until FFmpeg process completes
+        //             await process.WaitForExitAsync();
 
-                    // Handle non-zero exit code
-                    if (process.ExitCode != 0)
-                    {
-                        var error = await process.StandardError.ReadToEndAsync();
-                        _logger.LogError("❌ FFmpeg failed with exit code {ExitCode}: {Error}", process.ExitCode, error);
-                        throw new InvalidOperationException($"FFmpeg failed with exit code {process.ExitCode}: {error}");
-                    }
-                }
+        //             // Handle non-zero exit code
+        //             if (process.ExitCode != 0)
+        //             {
+        //                 var error = await process.StandardError.ReadToEndAsync();
+        //                 _logger.LogError("❌ FFmpeg failed with exit code {ExitCode}: {Error}", process.ExitCode, error);
+        //                 throw new InvalidOperationException($"FFmpeg failed with exit code {process.ExitCode}: {error}");
+        //             }
+        //         }
 
-                _logger.LogInformation("✅ FFmpeg thumbnail generation completed successfully.");
+        //         _logger.LogInformation("✅ FFmpeg thumbnail generation completed successfully.");
 
-                // Reset stream position to beginning before returning
-                thumbnailStream.Position = 0;
-                return thumbnailStream;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "❌ Error generating thumbnail from video at time {Time}", time);
+        //         // Reset stream position to beginning before returning
+        //         thumbnailStream.Position = 0;
+        //         return thumbnailStream;
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         _logger.LogError(ex, "❌ Error generating thumbnail from video at time {Time}", time);
 
-                // Ensure memory stream is cleaned up if something goes wrong
-                thumbnailStream?.Dispose();
-                throw;
-            }
-        }
+        //         // Ensure memory stream is cleaned up if something goes wrong
+        //         thumbnailStream?.Dispose();
+        //         throw;
+        //     }
+        // }
 
 
 
@@ -199,7 +199,7 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
                 // -vf fps=1/5: extract 1 frame every 5 seconds
                 // -scale=320:180: resize to 320x180
                 // -frames:v 5: extract 5 thumbnails
-                string ffmpegArgs = $"-i \"{filePath}\" -vf fps=1/5,scale=320:180 -frames:v 5 \"{outputPattern}\"";
+                string ffmpegArgs = $"-i \"{filePath}\" -vf fps=1/5,scale={Constants.thumbnailDefaultScale} -frames:v {Constants.thumbnailDefaultAmount} \"{outputPattern}\"";
 
                 var psi = new ProcessStartInfo
                 {
@@ -277,6 +277,6 @@ namespace VideoTranscoder.VideoTranscoder.Worker.Services
 //     throw new InvalidOperationException($"Unsupported encoding profile type: {encodingProfile.FormatType}");
 // }
 
-            // Determine FFmpeg command based on encoding profile type (DASH or HLS)
-            // var builder = FfmpegCommandBuilderFactory.GetBuilder(encodingProfile.FormatType);
-            // string ffmpegArgs = builder.Build(filePath, encodingProfile, outputDir);
+// Determine FFmpeg command based on encoding profile type (DASH or HLS)
+// var builder = FfmpegCommandBuilderFactory.GetBuilder(encodingProfile.FormatType);
+// string ffmpegArgs = builder.Build(filePath, encodingProfile, outputDir);
